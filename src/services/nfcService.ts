@@ -11,12 +11,14 @@ let initialized = false;
 
 interface CardMetadata {
   userId?: string;
+  posToken?: string;
   version: number;
 }
 
 export interface ReadCardResult {
   shareA: Uint8Array;
   userId: string | null;
+  posToken: string | null;
 }
 
 export interface NfcDiagnosticsResult {
@@ -30,6 +32,7 @@ export interface WriteShareOptions {
   tagPassword?: string;
   metadata?: {
     userId?: string;
+    posToken?: string;
   };
 }
 
@@ -86,6 +89,10 @@ const parseCardMetadata = (rawText: string): CardMetadata | null => {
       return null;
     }
 
+    if (parsed.posToken && typeof parsed.posToken !== 'string') {
+      return null;
+    }
+
     return parsed;
   } catch (_err) {
     return null;
@@ -131,6 +138,7 @@ export const nfcService = {
       const metaPayload = Buffer.from(JSON.stringify({
         version: 1,
         userId: normalizedOptions.metadata.userId,
+        posToken: normalizedOptions.metadata.posToken,
       })).toJSON().data;
 
       records.push(
@@ -257,10 +265,12 @@ export const nfcService = {
       });
 
       let resolvedUserId: string | null = null;
+      let resolvedPosToken: string | null = null;
       if (metadataRecord?.payload) {
         const metaJson = Buffer.from(metadataRecord.payload).toString('utf8');
         const metadata = parseCardMetadata(metaJson);
         resolvedUserId = metadata?.userId ?? null;
+        resolvedPosToken = metadata?.posToken ?? null;
       }
 
       if (shareRecord?.payload) {
@@ -276,6 +286,7 @@ export const nfcService = {
           return {
             shareA: Uint8Array.from(shareRecord.payload),
             userId: resolvedUserId,
+            posToken: resolvedPosToken,
           };
         }
 
@@ -285,6 +296,7 @@ export const nfcService = {
           return {
             shareA: parsedExternal,
             userId: resolvedUserId,
+            posToken: resolvedPosToken,
           };
         }
       }
@@ -297,6 +309,7 @@ export const nfcService = {
           return {
             shareA: parsed,
             userId: resolvedUserId,
+            posToken: resolvedPosToken,
           };
         }
       }

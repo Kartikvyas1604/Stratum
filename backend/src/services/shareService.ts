@@ -8,6 +8,7 @@ export interface UserShareRecord {
   sessionToken: string;
   deviceFingerprint: string;
   shareB: string;
+  posToken: string;
 }
 
 const memoryStore = new Map<string, UserShareRecord>();
@@ -15,9 +16,10 @@ const memoryStore = new Map<string, UserShareRecord>();
 export const createUserShare = async (
   deviceFingerprint: string,
   shareB: string,
-): Promise<{ userId: string; sessionToken: string }> => {
+): Promise<{ userId: string; sessionToken: string; posToken: string }> => {
   const userId = randomUUID();
   const sessionToken = randomBytes(32).toString('hex');
+  const posToken = randomBytes(32).toString('hex');
 
   if (!pool || env.useInMemoryStore) {
     memoryStore.set(userId, {
@@ -25,19 +27,20 @@ export const createUserShare = async (
       sessionToken,
       deviceFingerprint,
       shareB,
+      posToken,
     });
-    return { userId, sessionToken };
+    return { userId, sessionToken, posToken };
   }
 
   await pool.query(
     `
-      INSERT INTO user_shares (user_id, session_token, device_fingerprint, share_b)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO user_shares (user_id, session_token, device_fingerprint, share_b, pos_token)
+      VALUES ($1, $2, $3, $4, $5)
     `,
-    [userId, sessionToken, deviceFingerprint, shareB],
+    [userId, sessionToken, deviceFingerprint, shareB, posToken],
   );
 
-  return { userId, sessionToken };
+  return { userId, sessionToken, posToken };
 };
 
 export const fetchShareB = async (
@@ -71,6 +74,30 @@ export const fetchShareB = async (
   );
 
   if (result.rowCount === 0) {
+    return null;
+  }
+
+  return result.rows[0].share_b as string;
+};
+
+export const fetchShareBForPOS = async (
+  userId: string,
+  posToken: string,
+): Promise<string | null> => {
+  if (!pool || env.useInMemoryStore) {
+    const record = memoryStore.get(userId);
+    if (!record || record.posToken !== posToken) {
+      return null;
+    }
+    return record.shareB;
+  }
+
+  const result = await pool.query(
+    `SELECT share_b FROM user_shares WHERE user_id = $1 AND pos_token = $2 LIMIT 1`,
+    [userId, posToken],
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
     return null;
   }
 

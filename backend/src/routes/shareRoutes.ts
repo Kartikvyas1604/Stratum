@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { fetchShareB, updateShareB } from '../services/shareService';
+import { fetchShareB, fetchShareBForPOS, updateShareB } from '../services/shareService';
 
 const router = Router();
 
@@ -48,6 +48,25 @@ router.post('/fetch', async (req, res) => {
   }
 
   // Server share is released only to authenticated device + valid session token combinations.
+  return res.status(200).json({ shareB: share });
+});
+
+const fetchPosSchema = z.object({
+  userId: z.string().uuid(),
+  posToken: z.string().min(16),
+});
+
+router.post('/fetch-pos', async (req, res) => {
+  const parsed = fetchPosSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: 'Invalid request body', issues: parsed.error.issues });
+  }
+
+  const share = await fetchShareBForPOS(parsed.data.userId, parsed.data.posToken);
+  if (!share) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
   return res.status(200).json({ shareB: share });
 });
 

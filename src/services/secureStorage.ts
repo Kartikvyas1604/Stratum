@@ -5,6 +5,7 @@ const SERVICE = 'nfc-split-wallet';
 const SESSION_ACCOUNT = 'session-token';
 const DEVICE_ACCOUNT = 'device-fingerprint';
 const PROFILE_ACCOUNT = 'wallet-profile';
+const POS_TOKEN_ACCOUNT = 'pos-token';
 
 interface WalletProfile {
   userId: string;
@@ -55,7 +56,25 @@ export const secureStorage = {
       Keychain.resetGenericPassword({ service: `${SERVICE}-session` }),
       Keychain.resetGenericPassword({ service: `${SERVICE}-device` }),
       Keychain.resetGenericPassword({ service: `${SERVICE}-profile` }),
+      Keychain.resetGenericPassword({ service: `${SERVICE}-pos-token` }),
     ]);
+  },
+
+  async savePosToken(token: string): Promise<void> {
+    await Keychain.setGenericPassword(POS_TOKEN_ACCOUNT, token, {
+      service: `${SERVICE}-pos-token`,
+      accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
+  },
+
+  async getPosToken(): Promise<string | null> {
+    const creds = await Keychain.getGenericPassword({
+      service: `${SERVICE}-pos-token`,
+    });
+    if (!creds) {
+      return null;
+    }
+    return creds.password;
   },
 
   async saveWalletProfile(profile: WalletProfile): Promise<void> {

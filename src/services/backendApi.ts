@@ -3,6 +3,7 @@ import { NativeModules, Platform } from 'react-native';
 import {
   BackendFetchShareRequest,
   BackendFetchShareResponse,
+  BackendFetchSharePosRequest,
   BackendRegisterRequest,
   BackendRegisterResponse,
 } from '../types';
@@ -158,6 +159,14 @@ export const backendApi = {
       }
     */
     return postJson<BackendFetchShareRequest, BackendFetchShareResponse>('/api/share/fetch', payload, {
+      retries: 2,
+      retryDelayMs: 400,
+      requestTimeoutMs: 5000,
+    });
+  },
+
+  fetchShareBForPOS(payload: BackendFetchSharePosRequest): Promise<BackendFetchShareResponse> {
+    return postJson<BackendFetchSharePosRequest, BackendFetchShareResponse>('/api/share/fetch-pos', payload, {
       retries: 2,
       retryDelayMs: 400,
       requestTimeoutMs: 5000,

@@ -44,6 +44,12 @@ export interface BackendRegisterRequest {
 export interface BackendRegisterResponse {
   userId: string;
   sessionToken: string;
+  posToken: string;
+}
+
+export interface BackendFetchSharePosRequest {
+  userId: string;
+  posToken: string;
 }
 
 export interface BackendFetchShareRequest {
@@ -65,6 +71,7 @@ export interface PaymentRequest {
 export interface WalletContextState {
   isSetupComplete: boolean;
   userId: string | null;
+  posToken: string | null;
   addresses: WalletAddresses | null;
   balances: WalletBalances;
   recentTransactions: TransactionPreview[];
