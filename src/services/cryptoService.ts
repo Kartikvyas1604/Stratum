@@ -17,8 +17,8 @@ export interface GeneratedWalletSecrets {
   solAddress: string;
 }
 
-const deriveAesKey = (password: string, salt: Uint8Array): Buffer => {
-  return pbkdf2Sync(password, Buffer.from(salt), CONFIG.pbkdf2Iterations, 32, 'sha512');
+const deriveAesKey = (password: string, salt: Uint8Array) => {
+  return pbkdf2Sync(password, Buffer.from(salt), CONFIG.pbkdf2Iterations, 32, 'sha512') as unknown as Uint8Array;
 };
 
 export const generateMnemonic = (): string => {
@@ -68,7 +68,7 @@ export const encryptSeedBlob = (
     solPrivateKeyBase58,
   });
 
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const cipher = createCipheriv('aes-256-gcm', key as never, iv as never);
   const encrypted = Buffer.concat([cipher.update(payload, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
 
@@ -95,8 +95,8 @@ export const decryptSeedBlob = (encryptedBlob: string, password: string): Genera
   const tag = Buffer.from(parsed.tag, 'base64');
 
   const key = deriveAesKey(password, salt);
-  const decipher = createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(tag);
+  const decipher = createDecipheriv('aes-256-gcm', key as never, iv as never);
+  decipher.setAuthTag(tag as never);
 
   const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
   const data = JSON.parse(decrypted) as GeneratedWalletSecrets;
@@ -124,7 +124,7 @@ export const combineShares = (shareA: Uint8Array, shareB: Uint8Array): string =>
 
 export const createDeviceFingerprint = async (): Promise<string> => {
   const entropy = randomBytes(32).toString('hex');
-  return createHash('sha256').update(entropy).digest('hex');
+  return createHash('sha256').update(entropy).digest().toString('hex');
 };
 
 export const wipeWalletSecrets = (secrets: Partial<GeneratedWalletSecrets> | null | undefined): void => {
