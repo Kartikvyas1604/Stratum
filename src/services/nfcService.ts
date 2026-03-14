@@ -1,4 +1,4 @@
-import NfcManager, { Ndef, NfcTech, NfcEvents, NfcError } from 'react-native-nfc-manager';
+import NfcManager, { Ndef, NfcTech, NfcError } from 'react-native-nfc-manager';
 
 const WALLET_RECORD_TYPE = 'application/vnd.nfc-split-wallet.share';
 

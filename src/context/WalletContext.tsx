@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { randomBytes } from 'react-native-quick-crypto';
+import { Buffer } from 'buffer';
 import { backendApi } from '../services/backendApi';
 import { sendEth, sendSol, sendUsdcOnEthereum, sendUsdcOnSolana } from '../services/blockchainService';
 import {
