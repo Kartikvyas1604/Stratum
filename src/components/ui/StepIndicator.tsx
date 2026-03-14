@@ -28,7 +28,7 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({ steps, currentStep
                   </Text>
                 )}
               </View>
-              <Text allowFontScaling={false} numberOfLines={1} style={[styles.label, active && styles.labelActive]}>
+              <Text allowFontScaling={false} style={[styles.label, active && styles.labelActive]}>
                 {step}
               </Text>
             </View>
@@ -49,10 +49,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     marginBottom: Spacing.lg,
+    width: '100%',
   },
   stepBlock: {
     alignItems: 'center',
-    maxWidth: 90,
+    flex: 1,
+    minWidth: 0,
   },
   circle: {
     alignItems: 'center',
@@ -80,6 +82,7 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.textMuted,
     marginTop: 6,
+    minHeight: 28,
     textAlign: 'center',
   },
   labelActive: {
@@ -89,7 +92,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.borderMid,
     flex: 1,
     height: 2,
-    marginHorizontal: Spacing.sm,
+    marginHorizontal: Spacing.xs,
   },
   lineFill: {
     backgroundColor: Colors.transparent,

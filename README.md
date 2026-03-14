@@ -145,6 +145,38 @@ cd ios && pod install
 npm run ios
 ```
 
+### Easiest iOS flow
+
+For day-to-day iOS work on macOS, use the single command below from the repo root:
+
+```bash
+npm run ios:easy
+```
+
+What it does:
+
+- uses `bundle exec pod install` only when the Gemfile gems are already installed
+- otherwise falls back cleanly to plain `pod install`
+- boots the app on the `iPhone 17 Pro` simulator
+- starts Metro automatically through `react-native run-ios`
+
+Other useful iOS commands:
+
+```bash
+npm run ios:pods   # only install/update pods
+npm run ios        # run on the default simulator
+npm run ios:open   # open the Xcode workspace directly
+```
+
+If you prefer Xcode:
+
+```bash
+npm run ios:pods
+npm run ios:open
+```
+
+Then select the `ethmumbai_native_seed` scheme and press Run.
+
 ## Backend Modes
 
 ### Demo mode (no DB)

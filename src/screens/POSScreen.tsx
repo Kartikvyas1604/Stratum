@@ -25,6 +25,7 @@ import { TransactionRow } from '../components/ui/TransactionRow';
 import { useWallet } from '../context/WalletContext';
 import { nfcService } from '../services/nfcService';
 import { Colors, Radius, Spacing } from '../theme/colors';
+import { useResponsiveLayout } from '../theme/responsive';
 import { Typography } from '../theme/typography';
 import { ChainAsset, TransactionPreview } from '../types';
 import { isPositiveAmount } from '../utils/validation';
@@ -87,6 +88,7 @@ const nextAmount = (current: string, key: string) => {
 
 export const POSScreen: React.FC = () => {
   const { addresses, recentTransactions, sendPaymentInPosMode } = useWallet();
+  const layout = useResponsiveLayout();
   const [tab, setTab] = useState<PosTab>('qr');
   const [asset, setAsset] = useState<ChainAsset>('ETH');
   const [amount, setAmount] = useState('');
@@ -236,12 +238,12 @@ export const POSScreen: React.FC = () => {
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <Animated.View style={[styles.flex, { opacity, transform: [{ translateY }] }]}>
         <ScrollView
-          contentContainerStyle={styles.container}
+          contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.headerRow}>
-            <Text allowFontScaling={false} style={styles.title}>Receive Payment</Text>
+          <View style={[styles.headerRow, layout.isCompact && styles.headerRowCompact]}>
+            <Text allowFontScaling={false} style={[styles.title, layout.isCompact && styles.titleCompact]}>Receive Payment</Text>
             <AddressChip
               address={merchantAddress || '0x0000'}
               chain={asset === 'SOL' || asset === 'USDC_SOL' ? 'SOL' : 'ETH'}
@@ -273,7 +275,7 @@ export const POSScreen: React.FC = () => {
           </ScrollView>
 
           <GradientCard style={styles.amountCard}>
-            <Text allowFontScaling={false} style={styles.amountText}>{amountValue}</Text>
+            <Text allowFontScaling={false} style={[styles.amountText, { fontSize: layout.clamp(layout.width * 0.13, 34, 48) }]}>{amountValue}</Text>
             <Text allowFontScaling={false} style={styles.currencyText}>{LABELS[asset]}</Text>
             <Text allowFontScaling={false} style={styles.usdText}>${usdValue.toFixed(2)}</Text>
           </GradientCard>
@@ -315,7 +317,7 @@ export const POSScreen: React.FC = () => {
                   Wallet address unavailable. Finish wallet setup to generate payment requests.
                 </Text>
               )}
-              <View style={styles.qrFooter}>
+              <View style={[styles.qrFooter, layout.isCompact && styles.qrFooterCompact]}>
                 <AddressChip
                   address={merchantAddress || '0x0000'}
                   chain={asset === 'SOL' || asset === 'USDC_SOL' ? 'SOL' : 'ETH'}
@@ -444,7 +446,7 @@ export const POSScreen: React.FC = () => {
               {receivedTx?.txHash ? (
                 <Text allowFontScaling={false} style={styles.overlayHash}>{receivedTx.txHash}</Text>
               ) : null}
-              <View style={styles.overlayButtons}>
+              <View style={[styles.overlayButtons, layout.modalActionsVertical && styles.overlayButtonsVertical]}>
                 <OrangeButton
                   label="New Payment"
                   onPress={() => {
@@ -487,9 +489,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: Spacing.md,
   },
+  headerRowCompact: {
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    flexWrap: 'wrap',
+  },
   title: {
     ...Typography.displayMd,
     color: Colors.offWhite,
+  },
+  titleCompact: {
+    fontSize: 20,
   },
   chainScroll: {
     marginBottom: Spacing.md,
@@ -593,6 +603,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: Spacing.lg,
     width: '100%',
+  },
+  qrFooterCompact: {
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    flexWrap: 'wrap',
   },
   nfcCard: {
     alignItems: 'center',
@@ -753,5 +768,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.md,
     marginTop: Spacing.xl,
+  },
+  overlayButtonsVertical: {
+    width: '100%',
+    flexDirection: 'column',
   },
 });

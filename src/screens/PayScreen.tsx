@@ -29,6 +29,7 @@ import { StepIndicator } from '../components/ui/StepIndicator';
 import { useWallet } from '../context/WalletContext';
 import { nfcService } from '../services/nfcService';
 import { Colors, Radius, Spacing } from '../theme/colors';
+import { useResponsiveLayout } from '../theme/responsive';
 import { Typography } from '../theme/typography';
 import { ChainAsset } from '../types';
 import { isPositiveAmount, validateRecipientByAsset } from '../utils/validation';
@@ -60,6 +61,7 @@ const getExplorerUrl = (asset: ChainAsset, txHash: string) => (
 
 export const PayScreen: React.FC = () => {
   const { balances, sendPaymentFromOwnDevice } = useWallet();
+  const layout = useResponsiveLayout();
   const [phase, setPhase] = useState<Phase>('select');
   const [asset, setAsset] = useState<ChainAsset>('ETH');
   const [recipient, setRecipient] = useState('');
@@ -232,8 +234,8 @@ export const PayScreen: React.FC = () => {
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <Animated.View style={[styles.flex, { opacity, transform: [{ translateY }] }]}>
-          <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Text allowFontScaling={false} style={styles.title}>Tap To Pay</Text>
+          <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <Text allowFontScaling={false} style={[styles.title, layout.isCompact && styles.titleCompact]}>Tap To Pay</Text>
             <Text allowFontScaling={false} style={styles.subtitle}>Fast, card-backed crypto payments with your phone.</Text>
 
             <GradientCard style={styles.stepCard}>
@@ -256,7 +258,7 @@ export const PayScreen: React.FC = () => {
                 </ScrollView>
 
                 <GradientCard>
-                  <View style={styles.balanceRow}>
+                  <View style={[styles.balanceRow, layout.isCompact && styles.balanceRowCompact]}>
                     <Text allowFontScaling={false} style={styles.balanceLabel}>Available Balance</Text>
                     <BalancePill asset={LABELS[asset]} balance={availableBalance} />
                   </View>
@@ -269,7 +271,7 @@ export const PayScreen: React.FC = () => {
                       onChangeText={setAmount}
                       placeholder="0.00"
                       placeholderTextColor={Colors.textFaint}
-                      style={styles.amountInput}
+                      style={[styles.amountInput, { fontSize: layout.clamp(layout.width * 0.12, 34, 42) }]}
                       value={amount}
                     />
                     <Text allowFontScaling={false} style={styles.currencyLabel}>{LABELS[asset]}</Text>
@@ -300,7 +302,7 @@ export const PayScreen: React.FC = () => {
 
             {phase === 'tap' && (
               <GradientCard style={styles.centeredPhase}>
-                <Text allowFontScaling={false} style={styles.title}>Tap your NFC card</Text>
+                <Text allowFontScaling={false} style={[styles.title, layout.isCompact && styles.titleCompact]}>Tap your NFC card</Text>
                 <Text allowFontScaling={false} style={styles.subtitleCentered}>Bring the customer card close to the phone to reconstruct your encrypted share.</Text>
                 <View style={styles.nfcArea}><NFCRingAnimation state={nfcState} /></View>
                 <Text allowFontScaling={false} style={styles.waitingText}>Timeout in {secondsLeft}s</Text>
@@ -312,7 +314,7 @@ export const PayScreen: React.FC = () => {
             {phase === 'confirm' && (
               <>
                 <GradientCard style={styles.summaryCard}>
-                  <Text allowFontScaling={false} style={styles.summaryAmount}>{amount} {LABELS[asset]}</Text>
+                  <Text allowFontScaling={false} style={[styles.summaryAmount, { fontSize: layout.clamp(layout.width * 0.085, 24, 28) }]}>{amount} {LABELS[asset]}</Text>
                   <Text allowFontScaling={false} style={styles.summaryUsd}>≈ ${usdValue.toFixed(2)}</Text>
                   <View style={styles.summaryArrow}><Feather color={Colors.brandOrange} name="arrow-down" size={20} /></View>
                   <AddressChip address={recipient.trim()} chain={chain} />
@@ -369,7 +371,7 @@ export const PayScreen: React.FC = () => {
                 <Text allowFontScaling={false} style={styles.resultAmount}>{amount} {LABELS[asset]}</Text>
                 <Text allowFontScaling={false} style={styles.resultMeta}>To {recipient.trim()}</Text>
                 {txHash ? <Pressable onPress={onOpenExplorer}><Text allowFontScaling={false} style={styles.txHash}>{txHash}</Text></Pressable> : null}
-                <View style={styles.resultActions}>
+                <View style={[styles.resultActions, layout.modalActionsVertical && styles.resultActionsVertical]}>
                   <OrangeButton label="Done" onPress={resetFlow} size="md" />
                   <OrangeButton label="Share Receipt" onPress={onShareReceipt} size="md" variant="outline" />
                 </View>
@@ -386,7 +388,7 @@ export const PayScreen: React.FC = () => {
                 </Svg>
                 <Text allowFontScaling={false} style={styles.resultTitle}>Payment Failed</Text>
                 <Text allowFontScaling={false} style={styles.errorText}>{failureMessage || 'Unable to process payment.'}</Text>
-                <View style={styles.resultActions}>
+                <View style={[styles.resultActions, layout.modalActionsVertical && styles.resultActionsVertical]}>
                   <OrangeButton label="Try Again" onPress={() => setPhase(shareARef.current ? 'confirm' : 'tap')} size="md" />
                   <OrangeButton label="Edit Details" onPress={() => setPhase('select')} size="md" variant="outline" />
                 </View>
@@ -404,6 +406,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { paddingBottom: 100, paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
   title: { ...Typography.displayMd, color: Colors.offWhite },
+  titleCompact: { fontSize: 20 },
   subtitle: { ...Typography.body, color: Colors.textMuted, marginBottom: Spacing.lg, marginTop: Spacing.sm },
   stepCard: { marginBottom: Spacing.lg },
   assetScroll: { marginBottom: Spacing.md },
@@ -413,6 +416,7 @@ const styles = StyleSheet.create({
   assetPillText: { ...Typography.labelSm, color: Colors.textMuted },
   assetPillTextActive: { color: Colors.offWhite },
   balanceRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.lg },
+  balanceRowCompact: { alignItems: 'flex-start', flexWrap: 'wrap', gap: Spacing.sm },
   balanceLabel: { ...Typography.labelSm, color: Colors.textMuted },
   amountWrap: { borderBottomColor: Colors.brandOrange, borderBottomWidth: 2, marginBottom: Spacing.xl, paddingBottom: Spacing.md },
   maxButton: { alignItems: 'center', alignSelf: 'flex-end', backgroundColor: Colors.orangeDim, borderColor: Colors.orangeMid, borderRadius: Radius.full, borderWidth: 1, marginBottom: Spacing.sm, paddingHorizontal: 12, paddingVertical: 6 },
@@ -447,5 +451,6 @@ const styles = StyleSheet.create({
   resultMeta: { ...Typography.body, color: Colors.textMuted, marginTop: Spacing.sm, textAlign: 'center' },
   txHash: { ...Typography.monoXs, color: Colors.brandOrange, marginTop: Spacing.md, textDecorationLine: 'underline' },
   resultActions: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.xl },
+  resultActionsVertical: { width: '100%', flexDirection: 'column' },
   errorText: { ...Typography.bodySm, color: Colors.error, marginBottom: Spacing.md, marginTop: Spacing.sm, textAlign: 'center' },
 });

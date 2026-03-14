@@ -5,7 +5,10 @@
   "scripts": {
     "start": "react-native start",
     "android": "react-native run-android",
-    "ios": "react-native run-ios --no-packager",
+    "ios": "react-native run-ios",
+    "ios:pods": "cd ios && (bundle check >/dev/null 2>&1 && bundle exec pod install || pod install)",
+    "ios:easy": "npm run ios:pods && react-native run-ios --simulator \"iPhone 17 Pro\"",
+    "ios:open": "open ios/ethmumbai_native_seed.xcworkspace",
     "typecheck": "tsc --noEmit",
     "backend:dev": "npm --prefix backend run dev",
     "start:backend": "npm --prefix backend run dev",

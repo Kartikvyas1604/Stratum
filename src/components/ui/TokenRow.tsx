@@ -69,12 +69,14 @@ const styles = StyleSheet.create({
   row: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
   leftBlock: {
     alignItems: 'center',
-    flexDirection: 'row',
     flex: 1,
+    flexDirection: 'row',
+    minWidth: 0,
   },
   iconShell: {
     alignItems: 'center',
@@ -110,16 +112,20 @@ const styles = StyleSheet.create({
   },
   rightBlock: {
     alignItems: 'flex-end',
+    flexShrink: 1,
     marginLeft: Spacing.md,
+    maxWidth: '45%',
   },
   balanceText: {
     ...Typography.mono,
     color: Colors.offWhite,
+    textAlign: 'right',
   },
   usdText: {
     ...Typography.bodySm,
     color: Colors.textMuted,
     marginTop: 2,
+    textAlign: 'right',
   },
   changeRow: {
     alignItems: 'center',

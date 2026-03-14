@@ -93,7 +93,7 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
 
 const styles = StyleSheet.create({
   row: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: Spacing.sm,
@@ -102,6 +102,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
+    minWidth: 0,
   },
   iconShell: {
     alignItems: 'center',
@@ -131,15 +132,19 @@ const styles = StyleSheet.create({
   },
   rightBlock: {
     alignItems: 'flex-end',
+    flexShrink: 1,
     marginLeft: Spacing.md,
+    maxWidth: '46%',
   },
   amountText: {
     ...Typography.monoSm,
+    textAlign: 'right',
   },
   statusText: {
     ...Typography.caption,
     color: Colors.textMuted,
     marginTop: 4,
+    textAlign: 'right',
     textTransform: 'capitalize',
   },
 });

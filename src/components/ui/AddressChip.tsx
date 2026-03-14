@@ -126,7 +126,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     gap: Spacing.sm,
+    maxWidth: '100%',
     minHeight: 36,
+    minWidth: 0,
     overflow: 'hidden',
     paddingLeft: Spacing.sm,
     paddingRight: Spacing.md - 2,
@@ -142,7 +144,9 @@ const styles = StyleSheet.create({
   addressText: {
     ...Typography.monoSm,
     color: Colors.offWhite,
-    maxWidth: 132,
+    flexShrink: 1,
+    maxWidth: 180,
+    minWidth: 0,
   },
   copyArea: {
     alignItems: 'center',

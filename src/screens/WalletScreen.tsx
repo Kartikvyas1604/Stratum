@@ -9,6 +9,7 @@ import { GradientCard } from '../components/ui/GradientCard';
 import { TokenRow } from '../components/ui/TokenRow';
 import { TransactionRow } from '../components/ui/TransactionRow';
 import { Colors, Radius, Spacing } from '../theme/colors';
+import { useResponsiveLayout } from '../theme/responsive';
 import { Typography } from '../theme/typography';
 import { useWallet } from '../context/WalletContext';
 
@@ -42,6 +43,7 @@ const buildChartPath = (values: number[], width: number, height: number) => {
 export const WalletScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { balances, addresses, recentTransactions, refreshBalances } = useWallet();
+  const layout = useResponsiveLayout();
   const [hideSmallBalances, setHideSmallBalances] = useState(false);
   const [activeAction, setActiveAction] = useState<'send' | 'receive' | 'scan' | 'history' | null>('send');
   const [loading, setLoading] = useState(false);
@@ -91,7 +93,8 @@ export const WalletScreen: React.FC = () => {
 
   const totalBalance = useMemo(() => assetData.reduce((sum, item) => sum + item.usdNumeric, 0), [assetData]);
   const chartValues = useMemo(() => [4522, 4580, 4621, 4710, 4668, 4775, Math.max(totalBalance, 4821.34)], [totalBalance]);
-  const chartPath = useMemo(() => buildChartPath(chartValues, 300, 72), [chartValues]);
+  const chartWidth = useMemo(() => Math.max(layout.width - layout.horizontalPadding * 2 - 32, 220), [layout.horizontalPadding, layout.width]);
+  const chartPath = useMemo(() => buildChartPath(chartValues, chartWidth, 72), [chartValues, chartWidth]);
   const recent = recentTransactions.slice(0, 4);
   const initials = addresses?.eth ? addresses.eth.slice(2, 4).toUpperCase() : 'MW';
 
@@ -108,7 +111,7 @@ export const WalletScreen: React.FC = () => {
   return (
     <SafeAreaView edges={["top"]} style={styles.safeArea}>
       <Animated.View style={[styles.flex, { opacity, transform: [{ translateY }] }]}>
-        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding }]} showsVerticalScrollIndicator={false}>
           <View style={styles.headerRow}>
             <View style={styles.headerSide}>
               <View style={styles.avatar}>
@@ -126,23 +129,23 @@ export const WalletScreen: React.FC = () => {
           <GradientCard glowColor={Colors.orangeGlow} style={styles.heroCard}>
             <Animated.View style={[styles.shimmer, { transform: [{ translateX: shimmer }, { rotate: '16deg' }] }]} />
             <Text allowFontScaling={false} style={styles.heroOverline}>TOTAL BALANCE</Text>
-            <Text allowFontScaling={false} style={styles.heroBalance}>${totalBalance.toFixed(2)}</Text>
+            <Text allowFontScaling={false} style={[styles.heroBalance, { fontSize: layout.clamp(layout.width * 0.11, 34, 48) }]}>${totalBalance.toFixed(2)}</Text>
             <Text allowFontScaling={false} style={styles.heroChange}>+$124.50 (2.6%)</Text>
-            <View style={styles.heroFooter}>
+            <View style={[styles.heroFooter, layout.isCompact && styles.heroFooterCompact]}>
               <AddressChip address={addresses?.eth ?? '0x0000000000000000'} chain="ETH" />
               <Pressable onPress={() => refreshBalances().catch(() => undefined)} style={styles.refreshButton}><Feather color={Colors.brandOrange} name="rotate-cw" size={16} /></Pressable>
             </View>
           </GradientCard>
 
           <GradientCard>
-            <Svg height={100} viewBox="0 0 320 100" width="100%">
+            <Svg height={100} viewBox={`0 0 ${chartWidth} 100`} width="100%">
               <Defs>
                 <SvgLinearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
                   <Stop offset="0" stopColor={Colors.orangeMid} />
                   <Stop offset="1" stopColor={Colors.transparent} />
                 </SvgLinearGradient>
               </Defs>
-              <Path d={`${chartPath} L 300 72 L 0 72 Z`} fill="url(#chartFill)" opacity={0.8} />
+              <Path d={`${chartPath} L ${chartWidth} 72 L 0 72 Z`} fill="url(#chartFill)" opacity={0.8} />
               <Path d={chartPath} fill="none" stroke={Colors.brandOrange} strokeLinecap="round" strokeWidth={3} />
             </Svg>
             <View style={styles.chartLabels}>
@@ -151,7 +154,7 @@ export const WalletScreen: React.FC = () => {
             </View>
           </GradientCard>
 
-          <View style={styles.actionsRow}>
+          <View style={[styles.actionsRow, layout.isCompact && styles.actionsRowCompact]}>
             {[
               ['send', 'arrow-up-right', 'Send'],
               ['receive', 'arrow-down-left', 'Receive'],
@@ -160,8 +163,8 @@ export const WalletScreen: React.FC = () => {
             ].map(([key, icon, label]) => {
               const active = activeAction === key;
               return (
-                <Pressable key={key} onPress={() => onActionPress(key as any)} style={styles.actionItem}>
-                  <View style={[styles.actionCircle, active && styles.actionCircleActive]}>
+                <Pressable key={key} onPress={() => onActionPress(key as any)} style={[styles.actionItem, layout.isCompact && styles.actionItemCompact]}>
+                  <View style={[styles.actionCircle, active && styles.actionCircleActive, layout.isCompact && styles.actionCircleCompact]}>
                     <Feather color={active ? Colors.brandOrange : Colors.offWhite} name={icon as any} size={18} />
                   </View>
                   <Text allowFontScaling={false} style={[styles.actionLabel, active && styles.actionLabelActive]}>{label}</Text>
@@ -170,7 +173,7 @@ export const WalletScreen: React.FC = () => {
             })}
           </View>
 
-          <View style={styles.sectionHeader}>
+          <View style={[styles.sectionHeader, layout.isCompact && styles.sectionHeaderCompact]}>
             <Text allowFontScaling={false} style={styles.sectionTitle}>Your Assets</Text>
             <View style={styles.toggleRow}>
               <Text allowFontScaling={false} style={styles.toggleLabel}>Hide small balances</Text>
@@ -190,7 +193,7 @@ export const WalletScreen: React.FC = () => {
             <TokenRow key={item.name} balance={item.balance} change24h={item.change24h} name={item.name} symbol={item.symbol} usdValue={item.usdValue} />
           ))}
 
-          <View style={styles.sectionHeader}>
+          <View style={[styles.sectionHeader, layout.isCompact && styles.sectionHeaderCompact]}>
             <Text allowFontScaling={false} style={styles.sectionTitle}>Recent Activity</Text>
             <Text allowFontScaling={false} style={styles.seeAll}>See All</Text>
           </View>
@@ -232,16 +235,21 @@ const styles = StyleSheet.create({
   heroBalance: { ...Typography.heroBalance, color: Colors.offWhite },
   heroChange: { ...Typography.label, color: Colors.success, marginTop: Spacing.sm },
   heroFooter: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: Spacing.lg },
+  heroFooterCompact: { alignItems: 'flex-start', gap: Spacing.sm, flexWrap: 'wrap' },
   refreshButton: { alignItems: 'center', backgroundColor: Colors.orangeDim, borderColor: Colors.orangeMid, borderRadius: Radius.full, borderWidth: 1, height: 36, justifyContent: 'center', width: 36 },
   chartLabels: { flexDirection: 'row', justifyContent: 'space-between' },
   chartLabel: { ...Typography.caption, color: Colors.textFaint },
   actionsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.lg, marginTop: Spacing.sm },
+  actionsRowCompact: { flexWrap: 'wrap', rowGap: Spacing.md },
   actionItem: { alignItems: 'center', width: '24%' },
+  actionItemCompact: { width: '48%' },
   actionCircle: { alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.full, height: 52, justifyContent: 'center', marginBottom: Spacing.sm, width: 52 },
+  actionCircleCompact: { height: 48, width: 48 },
   actionCircleActive: { backgroundColor: Colors.orangeDim },
   actionLabel: { ...Typography.labelSm, color: Colors.textMuted },
   actionLabelActive: { color: Colors.brandOrange },
   sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.sm, marginTop: Spacing.sm },
+  sectionHeaderCompact: { alignItems: 'flex-start', flexWrap: 'wrap', gap: Spacing.sm },
   sectionTitle: { ...Typography.heading3, color: Colors.offWhite },
   toggleRow: { alignItems: 'center', flexDirection: 'row', gap: Spacing.sm },
   toggleLabel: { ...Typography.caption, color: Colors.textMuted },

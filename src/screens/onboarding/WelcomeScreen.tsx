@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Ellipse, LinearGradient as SvgLinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import { OrangeButton } from '../../components/ui/OrangeButton';
 import { Colors, Radius, Spacing } from '../../theme/colors';
+import { useResponsiveLayout } from '../../theme/responsive';
 import { Typography } from '../../theme/typography';
 
 type WelcomeScreenProps = {
@@ -20,6 +21,7 @@ const FeaturePill: React.FC<{ label: string }> = ({ label }) => (
 );
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreate, onImport }) => {
+  const layout = useResponsiveLayout();
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(20)).current;
 
@@ -34,8 +36,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreate, onImport
     <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
       <Animated.View style={[styles.flex, { opacity, transform: [{ translateY }] }]}>
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-          <View style={styles.illustrationWrap}>
-            <Svg height={360} viewBox="0 0 360 360" width="100%">
+          <View style={[styles.illustrationWrap, { minHeight: layout.isVeryCompact ? 280 : layout.isCompact ? 320 : 360, paddingTop: layout.isCompact ? Spacing.md : Spacing.lg }]}>
+            <Svg height={layout.isVeryCompact ? 280 : layout.isCompact ? 320 : 360} viewBox="0 0 360 360" width="100%">
               <Defs>
                 <SvgLinearGradient id="cardGradient" x1="0" x2="1" y1="0" y2="1">
                   <Stop offset="0" stopColor={Colors.surface} />
@@ -66,8 +68,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreate, onImport
             </Svg>
           </View>
 
-          <View style={styles.bottomSection}>
-            <Text allowFontScaling={false} style={styles.headline}>
+          <View style={[styles.bottomSection, { paddingHorizontal: layout.isVeryCompact ? Spacing.lg : Spacing.xl }] }>
+            <Text allowFontScaling={false} style={[styles.headline, { fontSize: layout.clamp(layout.width * 0.085, 28, 32), lineHeight: layout.clamp(layout.width * 0.1, 34, 38) }]}>
               The Smartest{`\n`}Crypto Wallet
             </Text>
             <Text allowFontScaling={false} style={styles.subheadline}>

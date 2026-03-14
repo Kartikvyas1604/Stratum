@@ -19,6 +19,7 @@ import { NFCRingAnimation } from '../../components/ui/NFCRingAnimation';
 import { OrangeButton } from '../../components/ui/OrangeButton';
 import { StepIndicator } from '../../components/ui/StepIndicator';
 import { Colors, Radius, Spacing } from '../../theme/colors';
+import { useResponsiveLayout } from '../../theme/responsive';
 import { Typography } from '../../theme/typography';
 import { useWallet } from '../../context/WalletContext';
 import { validateMnemonic } from '../../services/cryptoService';
@@ -47,6 +48,7 @@ const getPasswordScore = (password: string) => {
 
 export const SetupWalletScreen: React.FC<SetupWalletScreenProps> = ({ mode, onBack, onSetupStart, onSetupComplete }) => {
   const { setupWallet, addresses } = useWallet();
+  const layout = useResponsiveLayout();
   const [step, setStep] = useState<SetupStep>('generate');
   const [lineIndex, setLineIndex] = useState(0);
   const [importMnemonic, setImportMnemonic] = useState('');
@@ -148,15 +150,15 @@ export const SetupWalletScreen: React.FC<SetupWalletScreenProps> = ({ mode, onBa
     <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
       <Animated.View style={[styles.flex, { opacity, transform: [{ translateY }] }]}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
-          <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <StepIndicator currentStep={progress} steps={['Generate', 'Secure', 'Write Card', 'Done']} />
 
             {step === 'generate' ? (
               <View>
-                <Animated.View style={[styles.spinnerShell, { transform: [{ rotate: ringRotation }] }]}>
+                <Animated.View style={[styles.spinnerShell, { marginTop: layout.isShort ? Spacing.lg : Spacing['2xl'], transform: [{ rotate: ringRotation }] }]}> 
                   <View style={styles.spinnerRing} />
                 </Animated.View>
-                <Text allowFontScaling={false} style={styles.title}>
+                <Text allowFontScaling={false} style={[styles.title, layout.isCompact && styles.titleCompact]}>
                   {mode === 'create' ? 'Generating your wallet...' : 'Restore your wallet'}
                 </Text>
                 <Text allowFontScaling={false} style={styles.subtitle}>
@@ -200,7 +202,7 @@ export const SetupWalletScreen: React.FC<SetupWalletScreenProps> = ({ mode, onBa
 
             {step === 'secure' ? (
               <View>
-                <Text allowFontScaling={false} style={styles.title}>Secure Your Wallet</Text>
+                <Text allowFontScaling={false} style={[styles.title, layout.isCompact && styles.titleCompact]}>Secure Your Wallet</Text>
                 <Text allowFontScaling={false} style={styles.subtitle}>
                   This password encrypts your keys. There is no recovery if forgotten.
                 </Text>
@@ -268,7 +270,7 @@ export const SetupWalletScreen: React.FC<SetupWalletScreenProps> = ({ mode, onBa
 
             {step === 'write' ? (
               <View style={styles.centerSection}>
-                <Text allowFontScaling={false} style={styles.title}>Tap Your NFC Card</Text>
+                <Text allowFontScaling={false} style={[styles.title, layout.isCompact && styles.titleCompact]}>Tap Your NFC Card</Text>
                 <Text allowFontScaling={false} style={styles.subtitleCentered}>
                   Hold your card to the back of your phone to write your secure key fragment.
                 </Text>
@@ -292,7 +294,7 @@ export const SetupWalletScreen: React.FC<SetupWalletScreenProps> = ({ mode, onBa
                 <View style={styles.doneBadge}>
                   <Feather color={Colors.success} name="check" size={28} />
                 </View>
-                <Text allowFontScaling={false} style={styles.title}>Wallet Ready!</Text>
+                <Text allowFontScaling={false} style={[styles.title, layout.isCompact && styles.titleCompact]}>Wallet Ready!</Text>
                 <GradientCard style={styles.addressCard}>
                   <Text allowFontScaling={false} style={styles.inputLabel}>ETH</Text>
                   <AddressChip address={addresses?.eth ?? 'Pending'} chain="ETH" />
@@ -341,6 +343,9 @@ const styles = StyleSheet.create({
     ...Typography.displayTitle,
     color: Colors.offWhite,
     textAlign: 'center',
+  },
+  titleCompact: {
+    fontSize: 26,
   },
   subtitle: {
     ...Typography.body,
