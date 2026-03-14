@@ -6,8 +6,33 @@ import { OnboardingScreen } from './screens/OnboardingScreen';
 import { theme } from './constants/theme';
 
 const AppShell: React.FC = () => {
-  const { isSetupComplete, initializeNfc } = useWallet();
+  const { isSetupComplete, initializeNfc, hydrateWallet } = useWallet();
   const [nfcError, setNfcError] = useState<string | null>(null);
+  const [booting, setBooting] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const run = async () => {
+      try {
+        await hydrateWallet();
+      } finally {
+        if (mounted) {
+          setBooting(false);
+        }
+      }
+    };
+
+    run().catch(() => {
+      if (mounted) {
+        setBooting(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [hydrateWallet]);
 
   useEffect(() => {
     initializeNfc().catch((error) => {
@@ -19,7 +44,8 @@ const AppShell: React.FC = () => {
     <SafeAreaView style={styles.root}>
       <StatusBar barStyle="light-content" />
       {nfcError ? <Text style={styles.errorBanner}>{nfcError}</Text> : null}
-      {isSetupComplete ? <RootNavigation /> : <OnboardingScreen />}
+      {booting ? <Text style={styles.loadingBanner}>Loading wallet profile…</Text> : null}
+      {!booting && (isSetupComplete ? <RootNavigation /> : <OnboardingScreen />)}
     </SafeAreaView>
   );
 };
@@ -47,5 +73,10 @@ const styles = StyleSheet.create({
     padding: theme.spacing.sm,
     borderRadius: theme.radius.sm,
     textAlign: 'center',
+  },
+  loadingBanner: {
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginTop: theme.spacing.xl,
   },
 });

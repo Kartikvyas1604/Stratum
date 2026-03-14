@@ -37,6 +37,9 @@ Configured in src/config.ts.
 - PBKDF2 SHA-512 (310000 iterations)
 - 2-of-2 Shamir split
 - Sensitive data wiping in memory after use
+- Startup wallet profile hydration from secure storage (session-safe resume)
+- Input validation for chain-specific recipient formats and positive amounts
+- Retry/backoff for transient backend share-fetch failures
 
 ### Backend
 

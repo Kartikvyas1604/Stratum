@@ -6,29 +6,56 @@ import {
   BackendRegisterResponse,
 } from '../types';
 
-const postJson = async <TReq, TRes>(path: string, payload: TReq): Promise<TRes> => {
-  let response: Response;
+interface PostJsonOptions {
+  retries?: number;
+  retryDelayMs?: number;
+}
 
-  try {
-    response = await fetch(`${CONFIG.apiBaseUrl}${path}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-  } catch (_error) {
-    throw new Error(
-      'Cannot reach backend API. Ensure backend is running and set src/config.ts apiBaseUrl to your computer LAN IP (not localhost) when using a physical phone.',
-    );
+const sleep = async (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRetryableStatus = (status: number): boolean => status >= 500 || status === 429;
+
+const postJson = async <TReq, TRes>(path: string, payload: TReq, options: PostJsonOptions = {}): Promise<TRes> => {
+  const retries = options.retries ?? 0;
+  const retryDelayMs = options.retryDelayMs ?? 350;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    let response: Response;
+
+    try {
+      response = await fetch(`${CONFIG.apiBaseUrl}${path}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (_error) {
+      if (attempt < retries) {
+        await sleep(retryDelayMs * (attempt + 1));
+        continue;
+      }
+
+      throw new Error(
+        'Cannot reach backend API. Ensure backend is running and set src/config.ts apiBaseUrl to your computer LAN IP (not localhost) when using a physical phone.',
+      );
+    }
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+
+      if (attempt < retries && isRetryableStatus(response.status)) {
+        await sleep(retryDelayMs * (attempt + 1));
+        continue;
+      }
+
+      throw new Error(errorBody || `Request failed: ${response.status}`);
+    }
+
+    return (await response.json()) as TRes;
   }
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(errorBody || `Request failed: ${response.status}`);
-  }
-
-  return (await response.json()) as TRes;
+  throw new Error('Backend request failed after retries.');
 };
 
 export const backendApi = {
@@ -63,7 +90,10 @@ export const backendApi = {
         shareB: string (base64)
       }
     */
-    return postJson<BackendFetchShareRequest, BackendFetchShareResponse>('/api/share/fetch', payload);
+    return postJson<BackendFetchShareRequest, BackendFetchShareResponse>('/api/share/fetch', payload, {
+      retries: 2,
+      retryDelayMs: 400,
+    });
   },
 
   updateShareB(payload: {
@@ -86,6 +116,9 @@ export const backendApi = {
         success: boolean
       }
     */
-    return postJson('/api/share/update', payload);
+    return postJson('/api/share/update', payload, {
+      retries: 1,
+      retryDelayMs: 400,
+    });
   },
 };

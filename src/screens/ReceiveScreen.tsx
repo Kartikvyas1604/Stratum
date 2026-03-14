@@ -21,6 +21,7 @@ import { nfcService } from '../services/nfcService';
 import { truncateAddress } from '../utils/format';
 import { ChainAsset } from '../types';
 import { wipeUint8 } from '../utils/memory';
+import { isPositiveAmount } from '../utils/validation';
 
 type ReceiveMode = 'receive' | 'pos';
 
@@ -65,11 +66,27 @@ export const ReceiveScreen: React.FC = () => {
       Alert.alert('Address missing', 'Merchant wallet address is unavailable.');
       return;
     }
+
+    if (!payerUserId.trim()) {
+      Alert.alert('Payer required', 'Enter payer user ID to fetch the server share.');
+      return;
+    }
+
+    if (!payerPassword.trim()) {
+      Alert.alert('Password required', 'Enter payer password to decrypt and sign.');
+      return;
+    }
+
+    if (!isPositiveAmount(receiveAmount || '0')) {
+      Alert.alert('Invalid amount', 'Amount must be greater than zero.');
+      return;
+    }
+
     setLoading(true);
     try {
       const tx = await sendPaymentInPosMode(payerPassword, payerUserId, {
         recipient: receiveAddress,
-        amount: receiveAmount || '0',
+        amount: receiveAmount.trim(),
         asset,
       }, posShareA);
       Alert.alert('Payment confirmed', `Transaction ${tx.txHash ?? 'submitted'} confirmed.`);

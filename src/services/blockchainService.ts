@@ -18,6 +18,24 @@ export interface WalletBalanceSnapshot {
   usdcSol: string;
 }
 
+const DECIMAL_AMOUNT_PATTERN = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
+
+const parseDecimalToBaseUnits = (amount: string, decimals: number): bigint => {
+  const trimmed = amount.trim();
+  if (!DECIMAL_AMOUNT_PATTERN.test(trimmed)) {
+    throw new Error('Invalid amount format.');
+  }
+
+  const [whole, fraction = ''] = trimmed.split('.');
+  if (fraction.length > decimals) {
+    throw new Error(`Amount supports at most ${decimals} decimal places.`);
+  }
+
+  const normalizedFraction = fraction.padEnd(decimals, '0');
+  const baseUnits = `${whole}${normalizedFraction}`.replace(/^0+/, '') || '0';
+  return BigInt(baseUnits);
+};
+
 export const fetchBalances = async (
   addresses: { eth: string; sol: string },
 ): Promise<WalletBalanceSnapshot> => {
@@ -82,6 +100,14 @@ export const sendEth = async (
 ): Promise<BroadcastResult> => {
   const { ethers } = require('ethers') as typeof import('ethers');
 
+  if (!ethers.isAddress(to)) {
+    throw new Error('Invalid Ethereum recipient address.');
+  }
+
+  if (parseDecimalToBaseUnits(amountEth, 18) <= 0n) {
+    throw new Error('Amount must be greater than zero.');
+  }
+
   const provider = new ethers.JsonRpcProvider(CONFIG.ethRpcUrl);
   const wallet = new ethers.Wallet(privateKey, provider);
 
@@ -101,12 +127,20 @@ export const sendUsdcOnEthereum = async (
 ): Promise<BroadcastResult> => {
   const { ethers } = require('ethers') as typeof import('ethers');
 
+  if (!ethers.isAddress(to)) {
+    throw new Error('Invalid Ethereum recipient address.');
+  }
+
   const provider = new ethers.JsonRpcProvider(CONFIG.ethRpcUrl);
   const wallet = new ethers.Wallet(privateKey, provider);
   const contract = new ethers.Contract(CONFIG.usdcEthContract, ERC20_ABI, wallet);
 
   const decimals = await contract.decimals();
-  const amount = ethers.parseUnits(amountUsdc, decimals);
+  const amount = parseDecimalToBaseUnits(amountUsdc, Number(decimals));
+
+  if (amount <= 0n) {
+    throw new Error('Amount must be greater than zero.');
+  }
 
   const tx = await contract.transfer(to, amount);
   await tx.wait();
@@ -121,7 +155,6 @@ export const sendSol = async (
   const {
     Connection,
     Keypair,
-    LAMPORTS_PER_SOL,
     PublicKey,
     SystemProgram,
     Transaction,
@@ -133,11 +166,18 @@ export const sendSol = async (
   const secretKey = Buffer.from(privateKeyBase64, 'base64');
   const fromKeypair = Keypair.fromSecretKey(Uint8Array.from(secretKey));
 
+  const lamportsBigInt = parseDecimalToBaseUnits(amountSol, 9);
+  if (lamportsBigInt <= 0n || lamportsBigInt > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error('Invalid SOL amount.');
+  }
+
+  const lamports = Number(lamportsBigInt);
+
   const tx = new Transaction().add(
     SystemProgram.transfer({
       fromPubkey: fromKeypair.publicKey,
       toPubkey: new PublicKey(to),
-      lamports: Number.parseFloat(amountSol) * LAMPORTS_PER_SOL,
+      lamports,
     }),
   );
 
@@ -183,7 +223,7 @@ export const sendUsdcOnSolana = async (
 
   try {
     const mintInfo = await getMint(solConnection, mint, 'confirmed');
-    const amount = BigInt(Math.round(Number.parseFloat(amountUsdc) * 10 ** mintInfo.decimals));
+    const amount = parseDecimalToBaseUnits(amountUsdc, mintInfo.decimals);
 
     if (amount <= 0n) {
       throw new Error('Amount must be greater than zero.');

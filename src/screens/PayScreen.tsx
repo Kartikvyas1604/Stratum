@@ -17,6 +17,7 @@ import { SectionLabel } from '../components/SectionLabel';
 import { theme } from '../constants/theme';
 import { useWallet } from '../context/WalletContext';
 import { ChainAsset } from '../types';
+import { isPositiveAmount, validateRecipientByAsset } from '../utils/validation';
 
 const ASSETS: ChainAsset[] = ['ETH', 'SOL', 'USDC_ETH', 'USDC_SOL'];
 
@@ -39,9 +40,29 @@ export const PayScreen: React.FC = () => {
   const canSubmit = useMemo(() => !!(password && recipient && amount), [password, recipient, amount]);
 
   const submit = async () => {
+    const trimmedRecipient = recipient.trim();
+    const trimmedAmount = amount.trim();
+
+    if (!password.trim()) {
+      Alert.alert('Missing password', 'Enter wallet password to authorize this payment.');
+      return;
+    }
+
+    if (!isPositiveAmount(trimmedAmount)) {
+      Alert.alert('Invalid amount', 'Amount must be greater than zero.');
+      return;
+    }
+
+    try {
+      validateRecipientByAsset(asset, trimmedRecipient);
+    } catch (error) {
+      Alert.alert('Invalid recipient', error instanceof Error ? error.message : 'Invalid recipient address.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const tx = await sendPaymentFromOwnDevice(password, { recipient, amount, asset });
+      const tx = await sendPaymentFromOwnDevice(password, { recipient: trimmedRecipient, amount: trimmedAmount, asset });
       Alert.alert('Payment sent', `Transaction ${tx.txHash ?? 'submitted'} confirmed.`);
       setPassword('');
       setRecipient('');
