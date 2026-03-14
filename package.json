@@ -7,7 +7,9 @@
     "android": "react-native run-android",
     "ios": "react-native run-ios --no-packager",
     "typecheck": "tsc --noEmit",
-    "backend:dev": "npm --prefix backend run dev"
+    "backend:dev": "npm --prefix backend run dev",
+    "start:backend": "npm --prefix backend run dev",
+    "start:bckend": "npm --prefix backend run dev"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.14",

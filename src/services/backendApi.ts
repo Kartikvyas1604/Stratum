@@ -37,7 +37,7 @@ const postJson = async <TReq, TRes>(path: string, payload: TReq, options: PostJs
       }
 
       throw new Error(
-        'Cannot reach backend API. Ensure backend is running and set src/config.ts apiBaseUrl to your computer LAN IP (not localhost) when using a physical phone.',
+        `Cannot reach backend API at ${CONFIG.apiBaseUrl}. Start backend with \"npm run backend:dev\" (or \"npm run start:backend\") and set src/config.ts apiBaseUrl to your current computer LAN IP when using a physical phone.`,
       );
     }
 
