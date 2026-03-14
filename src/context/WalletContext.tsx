@@ -20,7 +20,7 @@ import { wipeString, wipeUint8 } from '../utils/memory';
 
 interface WalletContextValue extends WalletContextState {
   initializeNfc: () => Promise<void>;
-  setupWallet: (password: string) => Promise<void>;
+  setupWallet: (password: string, existingMnemonic?: string) => Promise<void>;
   sendPaymentFromOwnDevice: (password: string, request: PaymentRequest) => Promise<TransactionPreview>;
   sendPaymentInPosMode: (
     password: string,
@@ -70,19 +70,14 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
     }));
   }, []);
 
-  const setupWallet = useCallback(async (password: string) => {
+  const setupWallet = useCallback(async (password: string, existingMnemonic?: string) => {
     let shareA: Uint8Array | null = null;
     let shareB: Uint8Array | null = null;
 
     try {
-      const mnemonic = generateMnemonic();
+      const mnemonic = existingMnemonic?.trim() || generateMnemonic();
       const derived = deriveKeysFromMnemonic(mnemonic);
-      const encryptedBlob = encryptSeedBlob(
-        derived.mnemonic,
-        derived.ethPrivateKey,
-        derived.solPrivateKeyBase58,
-        password,
-      );
+      const encryptedBlob = encryptSeedBlob(derived.mnemonic, password);
 
       const split = splitEncryptedBlob(encryptedBlob);
       shareA = split.shareA;

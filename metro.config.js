@@ -8,7 +8,7 @@ module.exports = mergeConfig(defaultConfig, {
     extraNodeModules: {
       ...nodeLibs,
       crypto: require.resolve('react-native-quick-crypto'),
-      buffer: require.resolve('buffer'),
+      buffer: require.resolve('@craftzdog/react-native-buffer'),
       process: require.resolve('process/browser'),
     },
   },

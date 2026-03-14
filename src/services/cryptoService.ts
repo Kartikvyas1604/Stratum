@@ -1,10 +1,5 @@
 import 'react-native-get-random-values';
-import { randomBytes, pbkdf2Sync, createCipheriv, createDecipheriv, createHash } from 'react-native-quick-crypto';
-import * as bip39 from 'bip39';
-import { derivePath } from 'ed25519-hd-key';
-import { Keypair } from '@solana/web3.js';
-import { hdkey } from 'ethereumjs-wallet';
-import { split, combine } from 'shamirs-secret-sharing';
+import QuickCrypto from 'react-native-quick-crypto';
 import { CONFIG } from '../config';
 import { EncryptedBlobPayload, SplitShares } from '../types';
 import { wipeArray, wipeString, wipeUint8 } from '../utils/memory';
@@ -18,14 +13,21 @@ export interface GeneratedWalletSecrets {
 }
 
 const deriveAesKey = (password: string, salt: Uint8Array) => {
+  const { pbkdf2Sync } = QuickCrypto as any;
   return pbkdf2Sync(password, Buffer.from(salt), CONFIG.pbkdf2Iterations, 32, 'sha512') as unknown as Uint8Array;
 };
 
 export const generateMnemonic = (): string => {
+  const bip39 = require('bip39') as typeof import('bip39');
   return bip39.generateMnemonic(128);
 };
 
 export const deriveKeysFromMnemonic = (mnemonic: string): GeneratedWalletSecrets => {
+  const bip39 = require('bip39') as typeof import('bip39');
+  const { derivePath } = require('ed25519-hd-key') as typeof import('ed25519-hd-key');
+  const { Keypair } = require('@solana/web3.js') as typeof import('@solana/web3.js');
+  const { hdkey } = require('ethereumjs-wallet') as { hdkey: any };
+
   const seedBuffer = bip39.mnemonicToSeedSync(mnemonic);
 
   const ethWallet = hdkey
@@ -54,18 +56,16 @@ export const deriveKeysFromMnemonic = (mnemonic: string): GeneratedWalletSecrets
 
 export const encryptSeedBlob = (
   mnemonic: string,
-  ethPrivateKey: string,
-  solPrivateKeyBase58: string,
   password: string,
 ): string => {
+  const { randomBytes, createCipheriv } = QuickCrypto as any;
+
   const iv = randomBytes(12);
   const salt = randomBytes(32);
   const key = deriveAesKey(password, salt);
 
   const payload = JSON.stringify({
     mnemonic,
-    ethPrivateKey,
-    solPrivateKeyBase58,
   });
 
   const cipher = createCipheriv('aes-256-gcm', key as never, iv as never);
@@ -87,26 +87,34 @@ export const encryptSeedBlob = (
 };
 
 export const decryptSeedBlob = (encryptedBlob: string, password: string): GeneratedWalletSecrets => {
-  const parsed = JSON.parse(encryptedBlob) as EncryptedBlobPayload;
+  const { createDecipheriv } = QuickCrypto as any;
 
-  const iv = Buffer.from(parsed.iv, 'base64');
-  const salt = Buffer.from(parsed.salt, 'base64');
-  const ciphertext = Buffer.from(parsed.ciphertext, 'base64');
-  const tag = Buffer.from(parsed.tag, 'base64');
+  const encryptedPayload = JSON.parse(encryptedBlob) as EncryptedBlobPayload;
+
+  const iv = Buffer.from(encryptedPayload.iv, 'base64');
+  const salt = Buffer.from(encryptedPayload.salt, 'base64');
+  const ciphertext = Buffer.from(encryptedPayload.ciphertext, 'base64');
+  const tag = Buffer.from(encryptedPayload.tag, 'base64');
 
   const key = deriveAesKey(password, salt);
   const decipher = createDecipheriv('aes-256-gcm', key as never, iv as never);
   decipher.setAuthTag(tag as never);
 
   const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
-  const data = JSON.parse(decrypted) as GeneratedWalletSecrets;
+  const decryptedPayload = JSON.parse(decrypted) as { mnemonic: string };
+  const data = deriveKeysFromMnemonic(decryptedPayload.mnemonic);
 
   key.fill(0);
+  wipeString(decrypted);
 
   return data;
 };
 
 export const splitEncryptedBlob = (encryptedBlob: string): SplitShares => {
+  const { split } = require('shamirs-secret-sharing') as {
+    split: (secret: Buffer, opts: { shares: number; threshold: number }) => [Uint8Array, Uint8Array];
+  };
+
   const blobBytes = Buffer.from(encryptedBlob, 'utf8');
 
   // Shamir shares are information-theoretic fragments; one share reveals no usable secret.
@@ -116,6 +124,10 @@ export const splitEncryptedBlob = (encryptedBlob: string): SplitShares => {
 };
 
 export const combineShares = (shareA: Uint8Array, shareB: Uint8Array): string => {
+  const { combine } = require('shamirs-secret-sharing') as {
+    combine: (shares: Uint8Array[]) => Uint8Array;
+  };
+
   const combined = combine([shareA, shareB]);
   const reconstructed = Buffer.from(combined).toString('utf8');
   wipeUint8(combined);
@@ -123,8 +135,15 @@ export const combineShares = (shareA: Uint8Array, shareB: Uint8Array): string =>
 };
 
 export const createDeviceFingerprint = async (): Promise<string> => {
+  const { randomBytes, createHash } = QuickCrypto as any;
+
   const entropy = randomBytes(32).toString('hex');
   return createHash('sha256').update(entropy).digest().toString('hex');
+};
+
+export const validateMnemonic = (phrase: string): boolean => {
+  const bip39 = require('bip39') as typeof import('bip39');
+  return bip39.validateMnemonic(phrase.trim().toLowerCase().replace(/\s+/g, ' '));
 };
 
 export const wipeWalletSecrets = (secrets: Partial<GeneratedWalletSecrets> | null | undefined): void => {

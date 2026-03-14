@@ -1,14 +1,4 @@
 import { Buffer } from 'buffer';
-import { ethers } from 'ethers';
-import {
-  Connection,
-  Keypair,
-  LAMPORTS_PER_SOL,
-  PublicKey,
-  SystemProgram,
-  Transaction,
-  sendAndConfirmRawTransaction,
-} from '@solana/web3.js';
 import { CONFIG } from '../config';
 
 const ERC20_ABI = [
@@ -25,6 +15,8 @@ export const sendEth = async (
   to: string,
   amountEth: string,
 ): Promise<BroadcastResult> => {
+  const { ethers } = require('ethers') as typeof import('ethers');
+
   const provider = new ethers.JsonRpcProvider(CONFIG.ethRpcUrl);
   const wallet = new ethers.Wallet(privateKey, provider);
 
@@ -42,6 +34,8 @@ export const sendUsdcOnEthereum = async (
   to: string,
   amountUsdc: string,
 ): Promise<BroadcastResult> => {
+  const { ethers } = require('ethers') as typeof import('ethers');
+
   const provider = new ethers.JsonRpcProvider(CONFIG.ethRpcUrl);
   const wallet = new ethers.Wallet(privateKey, provider);
   const contract = new ethers.Contract(CONFIG.usdcEthContract, ERC20_ABI, wallet);
@@ -54,13 +48,23 @@ export const sendUsdcOnEthereum = async (
   return { txHash: tx.hash };
 };
 
-const solConnection = new Connection(CONFIG.solRpcUrl, 'confirmed');
-
 export const sendSol = async (
   privateKeyBase64: string,
   to: string,
   amountSol: string,
 ): Promise<BroadcastResult> => {
+  const {
+    Connection,
+    Keypair,
+    LAMPORTS_PER_SOL,
+    PublicKey,
+    SystemProgram,
+    Transaction,
+    sendAndConfirmRawTransaction,
+  } = require('@solana/web3.js') as typeof import('@solana/web3.js');
+
+  const solConnection = new Connection(CONFIG.solRpcUrl, 'confirmed');
+
   const secretKey = Buffer.from(privateKeyBase64, 'base64');
   const fromKeypair = Keypair.fromSecretKey(Uint8Array.from(secretKey));
 

@@ -1,31 +1,48 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
+import { GlassCard } from '../components/GlassCard';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { SectionLabel } from '../components/SectionLabel';
 import { theme } from '../constants/theme';
 import { useWallet } from '../context/WalletContext';
+import { truncateAddress } from '../utils/format';
 import { ChainAsset } from '../types';
 
-const receiveAssets: ChainAsset[] = ['ETH', 'SOL', 'USDC_ETH', 'USDC_SOL'];
+type ReceiveMode = 'receive' | 'pos';
+
+const ASSETS: ChainAsset[] = ['ETH', 'SOL', 'USDC_ETH', 'USDC_SOL'];
 
 export const ReceiveScreen: React.FC = () => {
   const { addresses, receiveAmount, setReceiveAmount, sendPaymentInPosMode } = useWallet();
 
+  const [mode, setMode] = useState<ReceiveMode>('receive');
+  const [asset, setAsset] = useState<ChainAsset>('ETH');
   const [payerUserId, setPayerUserId] = useState('');
   const [payerPassword, setPayerPassword] = useState('');
-  const [asset, setAsset] = useState<ChainAsset>('ETH');
   const [loading, setLoading] = useState(false);
 
-  const receiveAddress = useMemo(() => {
-    return asset.includes('SOL') || asset === 'SOL' ? addresses?.sol ?? '' : addresses?.eth ?? '';
-  }, [addresses?.eth, addresses?.sol, asset]);
+  const receiveAddress = useMemo(
+    () => (asset.includes('SOL') || asset === 'SOL' ? addresses?.sol ?? '' : addresses?.eth ?? ''),
+    [addresses, asset],
+  );
 
   const onProcessPosPayment = async () => {
     if (!receiveAddress) {
       Alert.alert('Address missing', 'Merchant wallet address is unavailable.');
       return;
     }
-
     setLoading(true);
     try {
       const tx = await sendPaymentInPosMode(payerPassword, payerUserId, {
@@ -33,84 +50,193 @@ export const ReceiveScreen: React.FC = () => {
         amount: receiveAmount || '0',
         asset,
       });
-      Alert.alert('POS payment confirmed', `Transaction ${tx.txHash ?? 'submitted'} confirmed.`);
+      Alert.alert('Payment confirmed', `Transaction ${tx.txHash ?? 'submitted'} confirmed.`);
       setPayerPassword('');
       setPayerUserId('');
     } catch (error) {
-      Alert.alert('POS payment failed', error instanceof Error ? error.message : 'Unable to process payment.');
+      Alert.alert('Payment failed', error instanceof Error ? error.message : 'Unable to process payment.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Receive / POS Mode</Text>
-      <Text style={styles.subtitle}>QR is active and NFC reader should be enabled on this device.</Text>
+    <KeyboardAvoidingView style={styles.kbv} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <ScreenHeader title="Receive" />
 
-      <TextInput
-        style={styles.input}
-        value={receiveAmount}
-        onChangeText={setReceiveAmount}
-        placeholder="Amount (optional)"
-        placeholderTextColor={theme.colors.textSecondary}
-        keyboardType="decimal-pad"
-      />
-
-      <View style={styles.assetRow}>
-        {receiveAssets.map((option) => (
-          <Text
-            key={option}
-            onPress={() => setAsset(option)}
-            style={[styles.assetChip, asset === option && styles.assetChipActive]}
+        {/* Mode toggle */}
+        <View style={styles.modeToggle}>
+          <Pressable
+            style={[styles.modeBtn, mode === 'receive' && styles.modeBtnActive]}
+            onPress={() => setMode('receive')}
           >
-            {option}
-          </Text>
-        ))}
-      </View>
+            <Text style={[styles.modeBtnText, mode === 'receive' && styles.modeBtnTextActive]}>
+              My QR Code
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.modeBtn, mode === 'pos' && styles.modeBtnActive]}
+            onPress={() => setMode('pos')}
+          >
+            <Text style={[styles.modeBtnText, mode === 'pos' && styles.modeBtnTextActive]}>
+              POS Mode
+            </Text>
+          </Pressable>
+        </View>
 
-      <View style={styles.qrWrap}>
-        {receiveAddress ? <QRCode value={receiveAddress} size={180} /> : <Text style={styles.fallback}>No address available</Text>}
-      </View>
+        {/* Asset selector */}
+        <SectionLabel label="Asset" />
+        <View style={styles.chipRow}>
+          {ASSETS.map((a) => (
+            <Pressable
+              key={a}
+              onPress={() => setAsset(a)}
+              style={[styles.chip, asset === a && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, asset === a && styles.chipTextActive]}>{a}</Text>
+            </Pressable>
+          ))}
+        </View>
 
-      <Text style={styles.status}>NFC Reader Mode: Active</Text>
+        {mode === 'receive' && (
+          <>
+            <GlassCard>
+              <View style={styles.qrBox}>
+                {receiveAddress ? (
+                  <QRCode value={receiveAddress} size={180} />
+                ) : (
+                  <Text style={styles.noAddr}>No address — complete wallet setup first.</Text>
+                )}
+              </View>
+            </GlassCard>
 
-      <TextInput
-        style={styles.input}
-        value={payerUserId}
-        onChangeText={setPayerUserId}
-        placeholder="Payer user ID"
-        placeholderTextColor={theme.colors.textSecondary}
-      />
-      <TextInput
-        style={styles.input}
-        value={payerPassword}
-        onChangeText={setPayerPassword}
-        placeholder="Payer password"
-        placeholderTextColor={theme.colors.textSecondary}
-        secureTextEntry
-      />
+            {receiveAddress ? (
+              <GlassCard>
+                <Text style={styles.addrLabel}>{asset} Address</Text>
+                <Text style={styles.addrFull} selectable>
+                  {receiveAddress}
+                </Text>
+                <Text style={styles.addrTrunc}>{truncateAddress(receiveAddress)}</Text>
+              </GlassCard>
+            ) : null}
+          </>
+        )}
 
-      <PrimaryButton title="Process POS Payment" onPress={onProcessPosPayment} loading={loading} />
-    </ScrollView>
+        {mode === 'pos' && (
+          <>
+            <SectionLabel label="Amount to Collect" />
+            <TextInput
+              style={styles.input}
+              value={receiveAmount}
+              onChangeText={setReceiveAmount}
+              placeholder="0.00"
+              placeholderTextColor={theme.colors.textSecondary}
+              keyboardType="decimal-pad"
+            />
+
+            <SectionLabel label="Payer Details" />
+            <GlassCard>
+              <TextInput
+                style={[styles.input, styles.inputInCard]}
+                value={payerUserId}
+                onChangeText={setPayerUserId}
+                placeholder="Payer user ID"
+                placeholderTextColor={theme.colors.textSecondary}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TextInput
+                style={[styles.input, styles.inputLast]}
+                value={payerPassword}
+                onChangeText={setPayerPassword}
+                placeholder="Payer password"
+                placeholderTextColor={theme.colors.textSecondary}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </GlassCard>
+
+            <PrimaryButton title="Process Payment" onPress={onProcessPosPayment} loading={loading} />
+          </>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: theme.colors.background,
-    padding: theme.spacing.lg,
+  kbv: { flex: 1, backgroundColor: theme.colors.background },
+  container: { padding: theme.spacing.lg, paddingBottom: 40 },
+  modeToggle: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 3,
+    marginBottom: theme.spacing.xs,
   },
-  title: {
-    color: theme.colors.textPrimary,
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: theme.spacing.sm,
+  modeBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    alignItems: 'center',
+    borderRadius: theme.radius.sm,
   },
-  subtitle: {
+  modeBtnActive: { backgroundColor: theme.colors.accent },
+  modeBtnText: { color: theme.colors.textSecondary, fontWeight: '700', fontSize: 14 },
+  modeBtnTextActive: { color: theme.colors.background },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: theme.spacing.xs,
+  },
+  chip: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 99,
+  },
+  chipActive: {
+    borderColor: theme.colors.accent,
+    backgroundColor: 'rgba(42,230,215,0.08)',
+  },
+  chipText: { color: theme.colors.textSecondary, fontWeight: '600', fontSize: 13 },
+  chipTextActive: { color: theme.colors.accent },
+  qrBox: {
+    alignItems: 'center',
+    paddingVertical: theme.spacing.md,
+    backgroundColor: '#fff',
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
+  },
+  noAddr: {
     color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.md,
+    textAlign: 'center',
+    paddingVertical: theme.spacing.md,
   },
+  addrLabel: {
+    color: theme.colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: theme.spacing.xs,
+  },
+  addrFull: {
+    color: theme.colors.textPrimary,
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    lineHeight: 18,
+    marginBottom: 2,
+  },
+  addrTrunc: { color: theme.colors.textSecondary, fontSize: 12 },
   input: {
     backgroundColor: theme.colors.surfaceAlt,
     borderWidth: 1,
@@ -119,39 +245,8 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.sm,
+    fontSize: 15,
   },
-  qrWrap: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: theme.radius.md,
-    alignSelf: 'center',
-    marginVertical: theme.spacing.md,
-  },
-  fallback: {
-    color: theme.colors.background,
-  },
-  status: {
-    color: theme.colors.success,
-    marginBottom: theme.spacing.md,
-    textAlign: 'center',
-  },
-  assetRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: theme.spacing.sm,
-  },
-  assetChip: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    color: theme.colors.textSecondary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 99,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  assetChipActive: {
-    borderColor: theme.colors.accent,
-    color: theme.colors.accent,
-  },
+  inputInCard: { marginBottom: theme.spacing.sm },
+  inputLast: { marginBottom: 0 },
 });

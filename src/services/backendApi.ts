@@ -7,13 +7,21 @@ import {
 } from '../types';
 
 const postJson = async <TReq, TRes>(path: string, payload: TReq): Promise<TRes> => {
-  const response = await fetch(`${CONFIG.apiBaseUrl}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${CONFIG.apiBaseUrl}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (_error) {
+    throw new Error(
+      'Cannot reach backend API. Ensure backend is running and set src/config.ts apiBaseUrl to your computer LAN IP (not localhost) when using a physical phone.',
+    );
+  }
 
   if (!response.ok) {
     const errorBody = await response.text();

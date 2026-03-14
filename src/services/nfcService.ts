@@ -8,7 +8,8 @@ const buildPayload = (bytes: Uint8Array): number[] => {
 
 export const nfcService = {
   async initialize(): Promise<void> {
-    const supported = await NfcManager.isSupported();
+    try{
+          const supported = await NfcManager.isSupported();
     if (!supported) {
       throw new Error('NFC is not supported on this device.');
     }
@@ -19,11 +20,16 @@ export const nfcService = {
     }
 
     await NfcManager.start();
+    }catch(err){
+      console.warn('NFC initialization error (ignored):', err);
+    }
+
   },
 
   async writeShareToCard(shareA: Uint8Array, tagPassword?: string): Promise<void> {
     try {
       await NfcManager.requestTechnology(NfcTech.Ndef);
+      const tag = await NfcManager.getTag();
 
       const records = [
         Ndef.record(Ndef.TNF_MIME_MEDIA, WALLET_RECORD_TYPE, [], buildPayload(shareA)),
@@ -33,6 +39,17 @@ export const nfcService = {
 
       if (!bytes) {
         throw new Error('Unable to encode NFC payload.');
+      }
+
+      const maxSize = (tag as any)?.maxSize;
+      const isWritable = (tag as any)?.isWritable;
+
+      if (isWritable === false) {
+        throw new Error('Card is read-only. Use a writable NDEF NFC card.');
+      }
+
+      if (typeof maxSize === 'number' && bytes.length > maxSize) {
+        throw new Error(`Card capacity too small. Need ${bytes.length} bytes, but card supports ${maxSize} bytes.`);
       }
 
       // Some enterprise tags allow additional password operations through vendor-specific commands.
@@ -47,6 +64,14 @@ export const nfcService = {
       }
       if (err instanceof NfcError.Timeout) {
         throw new Error('NFC write timed out. Hold the card near the phone and retry.');
+      }
+      if (err instanceof Error) {
+        if (err.message.includes('IOException')) {
+          throw new Error(
+            'NFC write failed (I/O). Keep the phone still on the card and use an NDEF-writable card with enough capacity (recommended NTAG215/216).',
+          );
+        }
+        throw new Error(`Unable to write to NFC card: ${err.message}`);
       }
       throw new Error('Unable to write to NFC card. Please try again.');
     } finally {
@@ -92,11 +117,11 @@ export const nfcService = {
   },
 
   async startReaderMode(onDiscovered: () => void): Promise<void> {
-    await NfcManager.registerTagEvent(onDiscovered, 'Ready to read NFC wallet card', {
-      invalidateAfterFirstRead: false,
-      isReaderModeEnabled: true,
-      readerModeFlags: 0,
-    });
+     await NfcManager.registerTagEvent(onDiscovered, 'Ready to read NFC wallet card', {
+     invalidateAfterFirstRead: false,
+       isReaderModeEnabled: true,
+       readerModeFlags: 0,
+     });
   },
 
   async stopReaderMode(): Promise<void> {
