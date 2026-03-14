@@ -16,10 +16,12 @@ import {
 import { nfcService } from '../services/nfcService';
 import { secureStorage } from '../services/secureStorage';
 import { PaymentRequest, TransactionPreview, WalletContextState } from '../types';
+import { validatePaymentRequest } from '../utils/validation';
 import { wipeString, wipeUint8 } from '../utils/memory';
 
 interface WalletContextValue extends WalletContextState {
   initializeNfc: () => Promise<void>;
+  hydrateWallet: () => Promise<void>;
   setupWallet: (password: string, existingMnemonic?: string) => Promise<void>;
   sendPaymentFromOwnDevice: (password: string, request: PaymentRequest) => Promise<TransactionPreview>;
   sendPaymentInPosMode: (
@@ -49,19 +51,27 @@ const initialState: WalletContextState = {
 
 const WalletContext = createContext<WalletContextValue | undefined>(undefined);
 
-const mapError = (error: unknown): Error => {
-  if (error instanceof Error) {
-    return error;
-  }
-  return new Error('Unexpected failure. Please retry.');
-};
-
 export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [state, setState] = useState<WalletContextState>(initialState);
   const [receiveAmount, setReceiveAmount] = useState('');
 
   const initializeNfc = useCallback(async () => {
     await nfcService.initialize();
+  }, []);
+
+  const hydrateWallet = useCallback(async () => {
+    const profile = await secureStorage.getWalletProfile();
+
+    if (!profile) {
+      return;
+    }
+
+    setState((prev) => ({
+      ...prev,
+      isSetupComplete: true,
+      userId: profile.userId,
+      addresses: profile.addresses,
+    }));
   }, []);
 
   const addRecent = useCallback((tx: TransactionPreview) => {
@@ -95,6 +105,13 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
 
       await secureStorage.saveSessionToken(register.sessionToken);
       await secureStorage.saveDeviceFingerprint(deviceFingerprint);
+      await secureStorage.saveWalletProfile({
+        userId: register.userId,
+        addresses: {
+          eth: derived.ethAddress,
+          sol: derived.solAddress,
+        },
+      });
 
       setState((prev) => ({
         ...prev,
@@ -154,6 +171,7 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
   );
 
   const signAndBroadcast = useCallback(async (request: PaymentRequest, password: string, userId: string) => {
+    validatePaymentRequest(request);
     const secrets = await reconstructSecrets(password, userId);
 
     try {
@@ -211,6 +229,7 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
       request: PaymentRequest,
       preloadedShareA?: Uint8Array,
     ): Promise<TransactionPreview> => {
+      validatePaymentRequest(request);
       const secrets = await reconstructSecrets(password, payerUserId, preloadedShareA);
       let txHash = '';
 
@@ -268,6 +287,7 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
     () => ({
       ...state,
       initializeNfc,
+      hydrateWallet,
       setupWallet,
       sendPaymentFromOwnDevice,
       sendPaymentInPosMode,
@@ -278,6 +298,7 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
     }),
     [
       initializeNfc,
+      hydrateWallet,
       receiveAmount,
       refreshBalances,
       sendPaymentFromOwnDevice,
