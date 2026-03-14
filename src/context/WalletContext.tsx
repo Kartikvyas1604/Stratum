@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { randomBytes } from 'react-native-quick-crypto';
+import QuickCrypto from 'react-native-quick-crypto';
 import { Buffer } from 'buffer';
 import { backendApi } from '../services/backendApi';
 import { sendEth, sendSol, sendUsdcOnEthereum, sendUsdcOnSolana } from '../services/blockchainService';
@@ -186,7 +186,7 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
 
       const txHash = await signAndBroadcast(request, password, state.userId);
       const tx: TransactionPreview = {
-        id: randomBytes(8).toString('hex'),
+        id: (QuickCrypto as any).randomBytes(8).toString('hex'),
         chain: request.asset.includes('SOL') || request.asset === 'SOL' ? 'solana' : 'ethereum',
         asset: request.asset,
         amount: request.amount,
@@ -206,7 +206,7 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
     async (password: string, payerUserId: string, request: PaymentRequest): Promise<TransactionPreview> => {
       const txHash = await signAndBroadcast(request, password, payerUserId);
       const tx: TransactionPreview = {
-        id: randomBytes(8).toString('hex'),
+        id: (QuickCrypto as any).randomBytes(8).toString('hex'),
         chain: request.asset.includes('SOL') || request.asset === 'SOL' ? 'solana' : 'ethereum',
         asset: request.asset,
         amount: request.amount,

@@ -1,4 +1,4 @@
-import NfcManager, { Ndef, NfcTech, NfcError } from 'react-native-nfc-manager';
+import NfcManager, { Ndef, NfcTech, NfcError, NfcEvents } from 'react-native-nfc-manager';
 
 const WALLET_RECORD_TYPE = 'application/vnd.nfc-split-wallet.share';
 
@@ -117,14 +117,12 @@ export const nfcService = {
   },
 
   async startReaderMode(onDiscovered: () => void): Promise<void> {
-     await NfcManager.registerTagEvent(onDiscovered, 'Ready to read NFC wallet card', {
-     invalidateAfterFirstRead: false,
-       isReaderModeEnabled: true,
-       readerModeFlags: 0,
-     });
+    NfcManager.setEventListener(NfcEvents.DiscoverTag, onDiscovered);
+    await NfcManager.registerTagEvent();
   },
 
   async stopReaderMode(): Promise<void> {
+    NfcManager.setEventListener(NfcEvents.DiscoverTag, null);
     await NfcManager.unregisterTagEvent().catch(() => undefined);
   },
 };
