@@ -61,6 +61,16 @@ ethmumbai/
         shareRoutes.ts
       services/
         shareService.ts
+  contracts/
+    package.json
+    hardhat.config.ts
+    .env.example
+    contracts/
+      NfcPosPaymentHub.sol
+    scripts/
+      deploy.ts
+    test/
+      NfcPosPaymentHub.test.ts
 ```
 
 ## Mobile Features Implemented
@@ -216,6 +226,14 @@ npm run android
 - USDC on Solana transfer is intentionally placeholder (requires SPL token account strategy)
 - Recovery flow is placeholder (must include verified identity process + share rotation)
 - Full native iOS/Android project folders are expected in a React Native CLI initialized repo
+
+## Smart Contracts
+
+A dedicated Solidity workspace is now included under [contracts/README.md](contracts/README.md) for Ethereum POS settlement:
+- Native ETH settlement
+- ERC-20 settlement (USDC-compatible)
+- Merchant config and payout routing
+- Fee support and immutable payment receipt events
 
 ## Recommended Next Security Hardening
 
