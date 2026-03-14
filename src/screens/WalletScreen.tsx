@@ -16,7 +16,7 @@ const ASSET_COLORS: Record<string, string> = {
 };
 
 export const WalletScreen: React.FC = () => {
-  const { balances, addresses, recentTransactions, refreshBalances } = useWallet();
+  const { balances, addresses, recentTransactions, refreshBalances, userId } = useWallet();
 
   useEffect(() => {
     if (addresses) {
@@ -62,6 +62,21 @@ export const WalletScreen: React.FC = () => {
           </View>
         ))}
       </GlassCard>
+
+      {/* User ID for POS mode */}
+      {userId ? (
+        <>
+          <SectionLabel label="Wallet ID (POS Mode)" />
+          <GlassCard>
+            <Text style={styles.userIdHint}>
+              Share this ID with a merchant so they can process card payments on your behalf.
+            </Text>
+            <Text style={styles.userIdValue} selectable numberOfLines={1}>
+              {userId}
+            </Text>
+          </GlassCard>
+        </>
+      ) : null}
 
       {/* Addresses */}
       <SectionLabel label="Addresses" />
@@ -112,6 +127,19 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     paddingBottom: 40,
     backgroundColor: theme.colors.background,
+  },
+  userIdHint: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    marginBottom: theme.spacing.xs,
+    lineHeight: 17,
+  },
+  userIdValue: {
+    color: theme.colors.accent,
+    fontSize: 13,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    letterSpacing: 0.4,
   },
   heroLabel: {
     color: theme.colors.textSecondary,

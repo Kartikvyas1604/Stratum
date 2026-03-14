@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -29,7 +31,7 @@ const ASSET_META: Record<ChainAsset, { color: string; network: string }> = {
 };
 
 export const PayScreen: React.FC = () => {
-  const { sendPaymentFromOwnDevice } = useWallet();
+  const { sendPaymentFromOwnDevice, isNfcScanning } = useWallet();
 
   const [password, setPassword] = useState('');
   const [recipient, setRecipient] = useState('');
@@ -79,6 +81,17 @@ export const PayScreen: React.FC = () => {
       style={styles.kbv}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <Modal transparent animationType="fade" visible={isNfcScanning}>
+        <View style={styles.nfcOverlay}>
+          <View style={styles.nfcBox}>
+            <ActivityIndicator color={theme.colors.accent} size="large" />
+            <Text style={styles.nfcTitle}>Tap Your NFC Card</Text>
+            <Text style={styles.nfcSubtitle}>
+              Hold your wallet card flat against the back of your phone.
+            </Text>
+          </View>
+        </View>
+      </Modal>
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
@@ -156,6 +169,34 @@ export const PayScreen: React.FC = () => {
 const styles = StyleSheet.create({
   kbv: { flex: 1, backgroundColor: theme.colors.background },
   container: { padding: theme.spacing.lg, paddingBottom: 40 },
+  nfcOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nfcBox: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    padding: 32,
+    alignItems: 'center',
+    width: '80%',
+    gap: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+  },
+  nfcTitle: {
+    color: theme.colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  nfcSubtitle: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
   assetGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

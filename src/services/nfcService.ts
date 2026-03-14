@@ -138,7 +138,7 @@ export const nfcService = {
       );
     }
 
-    const bytes = Ndef.encodeMessage(records);
+    let bytes = Ndef.encodeMessage(records);
     if (!bytes) {
       throw new Error('Unable to encode NFC payload.');
     }
@@ -151,7 +151,14 @@ export const nfcService = {
       const selectedTech = await NfcManager.requestTechnology(requestedTech);
 
       if (Platform.OS === 'android' && selectedTech === NfcTech.NdefFormatable) {
-        await NfcManager.ndefFormatableHandlerAndroid.formatNdef(bytes);
+        // For formatable tags use share-only payload (unknown capacity before format)
+        const shareOnlyBytes = Ndef.encodeMessage([
+          Ndef.record(WALLET_RECORD_TNF, WALLET_RECORD_TYPE, [], buildPayload(shareA)),
+        ]);
+        if (!shareOnlyBytes) {
+          throw new Error('Unable to encode NFC payload.');
+        }
+        await NfcManager.ndefFormatableHandlerAndroid.formatNdef(shareOnlyBytes);
         return;
       }
 
@@ -164,8 +171,20 @@ export const nfcService = {
         throw new Error('Card is read-only. Use a writable NDEF NFC card.');
       }
 
+      // If the full message (share + metadata) does not fit, fall back to share-only.
+      // NTAG213 cards (137 bytes) can hold a share record but not the metadata record.
+      // NTAG215/NTAG216 cards have enough space for both.
       if (typeof maxSize === 'number' && bytes.length > maxSize) {
-        throw new Error(`Card capacity too small. Need ${bytes.length} bytes, but card supports ${maxSize} bytes.`);
+        if (records.length > 1) {
+          const shareOnlyRecords = [Ndef.record(WALLET_RECORD_TNF, WALLET_RECORD_TYPE, [], buildPayload(shareA))];
+          const shareOnlyBytes = Ndef.encodeMessage(shareOnlyRecords);
+          if (!shareOnlyBytes || shareOnlyBytes.length > maxSize) {
+            throw new Error(`Card capacity too small. Need ${shareOnlyBytes?.length ?? bytes.length} bytes, but card supports ${maxSize} bytes.`);
+          }
+          bytes = shareOnlyBytes;
+        } else {
+          throw new Error(`Card capacity too small. Need ${bytes.length} bytes, but card supports ${maxSize} bytes.`);
+        }
       }
 
       // Some enterprise tags allow additional password operations through vendor-specific commands.
