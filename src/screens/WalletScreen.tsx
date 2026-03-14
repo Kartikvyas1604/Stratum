@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { GlassCard } from '../components/GlassCard';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { SectionLabel } from '../components/SectionLabel';
+import { CONFIG } from '../config';
 import { theme } from '../constants/theme';
 import { useWallet } from '../context/WalletContext';
 import { truncateAddress } from '../utils/format';
@@ -15,13 +16,19 @@ const ASSET_COLORS: Record<string, string> = {
 };
 
 export const WalletScreen: React.FC = () => {
-  const { balances, addresses, recentTransactions } = useWallet();
+  const { balances, addresses, recentTransactions, refreshBalances } = useWallet();
+
+  useEffect(() => {
+    if (addresses) {
+      refreshBalances().catch(() => undefined);
+    }
+  }, [addresses?.eth, addresses?.sol, refreshBalances]);
 
   const balanceRows = [
-    { label: 'ETH', value: balances.eth },
-    { label: 'SOL', value: balances.sol },
-    { label: 'USDC (ETH)', value: balances.usdcEth },
-    { label: 'USDC (SOL)', value: balances.usdcSol },
+    { label: `ETH (${CONFIG.ethNetworkLabel})`, value: balances.eth },
+    { label: `SOL (${CONFIG.solNetworkLabel})`, value: balances.sol },
+    { label: `USDC (${CONFIG.ethNetworkLabel})`, value: balances.usdcEth },
+    { label: `USDC (${CONFIG.solNetworkLabel})`, value: balances.usdcSol },
   ];
 
   return (
@@ -33,9 +40,15 @@ export const WalletScreen: React.FC = () => {
 
       {/* Balance hero */}
       <GlassCard>
-        <Text style={styles.heroLabel}>ETH Balance</Text>
+        <Text style={styles.heroLabel}>{CONFIG.ethNetworkLabel}</Text>
         <Text style={styles.heroValue}>{balances.eth}</Text>
         <Text style={styles.heroUnit}>ETH</Text>
+      </GlassCard>
+
+      <GlassCard>
+        <Text style={styles.networkTitle}>Networks</Text>
+        <Text style={styles.networkText}>Ethereum: {CONFIG.ethNetworkLabel}</Text>
+        <Text style={styles.networkText}>Solana: {CONFIG.solNetworkLabel}</Text>
       </GlassCard>
 
       {/* All assets */}
@@ -54,13 +67,13 @@ export const WalletScreen: React.FC = () => {
       <SectionLabel label="Addresses" />
       <GlassCard>
         <View style={styles.addrRow}>
-          <Text style={styles.addrChain}>ETH</Text>
+          <Text style={styles.addrChain}>ETH ({CONFIG.ethNetworkLabel})</Text>
           <Text style={styles.addrValue} selectable>
             {truncateAddress(addresses?.eth ?? '—', 10, 6)}
           </Text>
         </View>
         <View style={[styles.addrRow, styles.addrRowBorder]}>
-          <Text style={styles.addrChain}>SOL</Text>
+          <Text style={styles.addrChain}>SOL ({CONFIG.solNetworkLabel})</Text>
           <Text style={styles.addrValue} selectable>
             {truncateAddress(addresses?.sol ?? '—', 10, 6)}
           </Text>
@@ -77,6 +90,7 @@ export const WalletScreen: React.FC = () => {
             <View key={tx.id} style={[styles.txRow, index > 0 && styles.txRowBorder]}>
               <View style={styles.txLeft}>
                 <Text style={styles.txAsset}>{tx.asset}</Text>
+                <Text style={styles.txChain}>{tx.chain === 'ethereum' ? CONFIG.ethNetworkLabel : CONFIG.solNetworkLabel}</Text>
                 <Text style={styles.txTo}>{truncateAddress(tx.to)}</Text>
               </View>
               <View style={styles.txRight}>
@@ -120,6 +134,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 4,
   },
+  networkTitle: {
+    color: theme.colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  networkText: {
+    color: theme.colors.textSecondary,
+    marginBottom: 4,
+    fontSize: 13,
+  },
   assetRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -158,9 +183,9 @@ const styles = StyleSheet.create({
   },
   addrChain: {
     color: theme.colors.textSecondary,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    width: 38,
+    width: 140,
     letterSpacing: 0.5,
   },
   addrValue: {
@@ -186,6 +211,7 @@ const styles = StyleSheet.create({
   },
   txLeft: { flex: 1 },
   txAsset: { color: theme.colors.textPrimary, fontWeight: '700', fontSize: 14 },
+  txChain: { color: theme.colors.textSecondary, fontSize: 11, marginTop: 1 },
   txTo: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 2 },
   txRight: { alignItems: 'flex-end' },
   txAmount: { color: theme.colors.textPrimary, fontWeight: '700', fontSize: 14 },

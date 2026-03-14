@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Clipboard from '@react-native-clipboard/clipboard';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -92,6 +93,16 @@ export const OnboardingScreen: React.FC = () => {
     }
   };
 
+  const onCopyMnemonic = () => {
+    if (!mnemonic) {
+      Alert.alert('No seed phrase', 'Generate a seed phrase first.');
+      return;
+    }
+
+    Clipboard.setString(mnemonic);
+    Alert.alert('Copied', 'Seed phrase copied to clipboard. Clear clipboard after backup.');
+  };
+
   // ── Step indicator ──────────────────────────────────────────
   const currentIndex = stepIndex[step];
 
@@ -161,9 +172,14 @@ export const OnboardingScreen: React.FC = () => {
             <Text style={styles.seedHint}>
               {showMnemonic ? 'Tap Hide when done' : 'Tap Reveal to show words'}
             </Text>
-            <Pressable onPress={() => setShowMnemonic((v) => !v)} style={styles.toggleBtn}>
-              <Text style={styles.toggleBtnText}>{showMnemonic ? 'Hide' : 'Reveal'}</Text>
-            </Pressable>
+            <View style={styles.seedActionRow}>
+              <Pressable onPress={() => setShowMnemonic((v) => !v)} style={styles.toggleBtn}>
+                <Text style={styles.toggleBtnText}>{showMnemonic ? 'Hide' : 'Reveal'}</Text>
+              </Pressable>
+              <Pressable onPress={onCopyMnemonic} style={styles.copyBtn}>
+                <Text style={styles.copyBtnText}>Copy</Text>
+              </Pressable>
+            </View>
           </View>
 
           <View style={styles.wordGrid}>
@@ -403,6 +419,11 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   seedHint: { color: theme.colors.textSecondary, fontSize: 13 },
+  seedActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   toggleBtn: {
     borderWidth: 1,
     borderColor: theme.colors.accent,
@@ -411,6 +432,15 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   toggleBtnText: { color: theme.colors.accent, fontWeight: '700', fontSize: 13 },
+  copyBtn: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: theme.colors.surfaceAlt,
+  },
+  copyBtnText: { color: theme.colors.textPrimary, fontWeight: '700', fontSize: 13 },
   wordGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
