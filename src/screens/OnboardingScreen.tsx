@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Clipboard from '@react-native-clipboard/clipboard';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -18,10 +19,10 @@ import { theme } from '../constants/theme';
 import { useWallet } from '../context/WalletContext';
 import { generateMnemonic, validateMnemonic } from '../services/cryptoService';
 
-type Step = 'welcome' | 'seed' | 'password';
+type Step = 'welcome' | 'seed' | 'password' | 'nfc';
 type Mode = 'create' | 'import';
 
-const STEP_LABELS = ['Choose', 'Seed Phrase', 'Password'];
+const STEP_LABELS = ['Choose', 'Seed Phrase', 'Password', 'NFC Card'];
 
 export const OnboardingScreen: React.FC = () => {
   const { setupWallet } = useWallet();
@@ -34,8 +35,9 @@ export const OnboardingScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [nfcAttemptNonce, setNfcAttemptNonce] = useState(0);
 
-  const stepIndex: Record<Step, number> = { welcome: 0, seed: 1, password: 2 };
+  const stepIndex: Record<Step, number> = { welcome: 0, seed: 1, password: 2, nfc: 3 };
 
   const onSelectCreate = () => {
     const m = generateMnemonic();
@@ -69,7 +71,7 @@ export const OnboardingScreen: React.FC = () => {
     setStep('password');
   };
 
-  const onSetupWallet = async () => {
+  const onContinueToNfcStep = () => {
     if (password.length < 8) {
       Alert.alert('Weak password', 'Use at least 8 characters.');
       return;
@@ -78,20 +80,44 @@ export const OnboardingScreen: React.FC = () => {
       Alert.alert('Password mismatch', 'Both passwords must match.');
       return;
     }
+
+    setNfcAttemptNonce((prev) => prev + 1);
+    setStep('nfc');
+  };
+
+  const onSetupWallet = async () => {
     setLoading(true);
+    let setupSucceeded = false;
     try {
       await setupWallet(password, mnemonic);
-      Alert.alert('Wallet ready', 'Your split-key wallet has been configured. Keep your NFC card safe.');
+      setupSucceeded = true;
+      Alert.alert('Wallet ready', 'NFC card programmed and split-key wallet configured successfully.');
     } catch (err) {
       Alert.alert('Setup failed', err instanceof Error ? err.message : 'Unable to setup wallet.');
     } finally {
       setLoading(false);
-      setPassword('');
-      setConfirmPassword('');
-      setMnemonic('');
-      setImportInput('');
+      if (setupSucceeded) {
+        setPassword('');
+        setConfirmPassword('');
+        setMnemonic('');
+        setImportInput('');
+      }
     }
   };
+
+  useEffect(() => {
+    if (step !== 'nfc') {
+      return;
+    }
+
+    if (loading) {
+      return;
+    }
+
+    onSetupWallet().catch(() => undefined);
+    // nfcAttemptNonce is incremented only when user intentionally enters/retries NFC step.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, nfcAttemptNonce]);
 
   const onCopyMnemonic = () => {
     if (!mnemonic) {
@@ -276,10 +302,47 @@ export const OnboardingScreen: React.FC = () => {
         </Text>
       </GlassCard>
 
-      <PrimaryButton title="Setup Wallet & Write NFC" onPress={onSetupWallet} loading={loading} />
+      <PrimaryButton title="Continue To NFC Tap →" onPress={onContinueToNfcStep} loading={loading} />
       <Pressable style={styles.backLink} onPress={() => setStep('seed')}>
         <Text style={styles.backLinkText}>← Back</Text>
       </Pressable>
+    </View>
+  );
+
+  // ── NFC step ────────────────────────────────────────────────
+  const renderNfcStep = () => (
+    <View>
+      <Text style={styles.stepTitle}>Tap Your NFC Card</Text>
+      <Text style={styles.stepDesc}>
+        Hold your writable NFC card against the back of your phone and keep it steady until setup is complete.
+      </Text>
+
+      <GlassCard>
+        <Text style={styles.nfcIcon}>📳</Text>
+        <Text style={styles.nfcBigHint}>Ready to write Share A to card</Text>
+        <Text style={styles.nfcHint}>
+          After successful write, your wallet setup finishes and you will continue to the app dashboard.
+        </Text>
+        <View style={styles.nfcLoaderWrap}>
+          <ActivityIndicator size="large" color={theme.colors.accent} />
+          <Text style={styles.nfcLoaderText}>Listening for NFC card…</Text>
+        </View>
+      </GlassCard>
+
+      <Pressable style={styles.backLink} onPress={() => setStep('password')}>
+        <Text style={styles.backLinkText}>← Back</Text>
+      </Pressable>
+      {!loading ? (
+        <Pressable
+          style={styles.retryLink}
+          onPress={() => {
+            setNfcAttemptNonce((prev) => prev + 1);
+            setStep('nfc');
+          }}
+        >
+          <Text style={styles.retryLinkText}>Retry NFC Detection</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 
@@ -298,6 +361,7 @@ export const OnboardingScreen: React.FC = () => {
         {step === 'seed' && mode === 'create' && renderCreateSeedStep()}
         {step === 'seed' && mode === 'import' && renderImportSeedStep()}
         {step === 'password' && renderPasswordStep()}
+        {step === 'nfc' && renderNfcStep()}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -502,7 +566,37 @@ const styles = StyleSheet.create({
   inputMultiline: { minHeight: 100, textAlignVertical: 'top' },
 
   // Password step
-  nfcHint: { color: theme.colors.textPrimary, fontSize: 14, lineHeight: 21 },
+  nfcHint: { color: theme.colors.textPrimary, fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  nfcIcon: {
+    fontSize: 54,
+    textAlign: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  nfcBigHint: {
+    color: theme.colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: theme.spacing.xs,
+  },
+  nfcLoaderWrap: {
+    marginTop: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  nfcLoaderText: {
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+    fontSize: 13,
+  },
+  retryLink: {
+    alignItems: 'center',
+    paddingVertical: theme.spacing.xs,
+  },
+  retryLinkText: {
+    color: theme.colors.accent,
+    fontWeight: '700',
+    fontSize: 13,
+  },
 
   // Shared
   input: {

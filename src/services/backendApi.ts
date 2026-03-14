@@ -1,4 +1,5 @@
 import { CONFIG } from '../config';
+import { NativeModules, Platform } from 'react-native';
 import {
   BackendFetchShareRequest,
   BackendFetchShareResponse,
@@ -9,53 +10,119 @@ import {
 interface PostJsonOptions {
   retries?: number;
   retryDelayMs?: number;
+  requestTimeoutMs?: number;
 }
 
 const sleep = async (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 const isRetryableStatus = (status: number): boolean => status >= 500 || status === 429;
 
+let activeApiBaseUrl: string | null = null;
+
+const normalizeBaseUrl = (value: string): string => value.replace(/\/+$/, '');
+
+const extractHostFromMetroScript = (): string | null => {
+  try {
+    const scriptUrl = (NativeModules as any)?.SourceCode?.scriptURL as string | undefined;
+    if (!scriptUrl) {
+      return null;
+    }
+
+    const match = scriptUrl.match(/^https?:\/\/([^/:]+)(?::\d+)?\//i);
+    return match?.[1] ?? null;
+  } catch (_err) {
+    return null;
+  }
+};
+
+const getApiBaseUrlCandidates = (): string[] => {
+  const candidates = new Set<string>();
+
+  if (activeApiBaseUrl) {
+    candidates.add(normalizeBaseUrl(activeApiBaseUrl));
+  }
+
+  candidates.add(normalizeBaseUrl(CONFIG.apiBaseUrl));
+
+  const metroHost = extractHostFromMetroScript();
+  if (metroHost) {
+    candidates.add(`http://${metroHost}:4000`);
+  }
+
+  // Common local development routes.
+  candidates.add('http://127.0.0.1:4000');
+  candidates.add('http://localhost:4000');
+
+  // Android emulator special host mappings.
+  if (Platform.OS === 'android') {
+    candidates.add('http://10.0.2.2:4000');
+    candidates.add('http://10.0.3.2:4000');
+  }
+
+  return Array.from(candidates);
+};
+
 const postJson = async <TReq, TRes>(path: string, payload: TReq, options: PostJsonOptions = {}): Promise<TRes> => {
   const retries = options.retries ?? 0;
   const retryDelayMs = options.retryDelayMs ?? 350;
+  const requestTimeoutMs = options.requestTimeoutMs ?? 5000;
+  const baseUrls = getApiBaseUrlCandidates();
+  const failures: string[] = [];
 
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    let response: Response;
+  for (const baseUrl of baseUrls) {
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      let response: Response;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), requestTimeoutMs);
 
-    try {
-      response = await fetch(`${CONFIG.apiBaseUrl}${path}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-    } catch (_error) {
-      if (attempt < retries) {
-        await sleep(retryDelayMs * (attempt + 1));
-        continue;
+      try {
+        response = await fetch(`${baseUrl}${path}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+      } catch (_error) {
+        clearTimeout(timeoutId);
+        if (attempt < retries) {
+          await sleep(retryDelayMs * (attempt + 1));
+          continue;
+        }
+
+        failures.push(`${baseUrl} (network/timeout)`);
+        break;
       }
 
-      throw new Error(
-        `Cannot reach backend API at ${CONFIG.apiBaseUrl}. Start backend with \"npm run backend:dev\" (or \"npm run start:backend\") and set src/config.ts apiBaseUrl to your current computer LAN IP when using a physical phone.`,
-      );
-    }
+      clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      const errorBody = await response.text();
+      if (!response.ok) {
+        const errorBody = await response.text();
 
-      if (attempt < retries && isRetryableStatus(response.status)) {
-        await sleep(retryDelayMs * (attempt + 1));
-        continue;
+        if (attempt < retries && isRetryableStatus(response.status)) {
+          await sleep(retryDelayMs * (attempt + 1));
+          continue;
+        }
+
+        failures.push(`${baseUrl} (HTTP ${response.status})`);
+        // If request reached server and failed with non-retryable response, bubble exact server error.
+        if (!isRetryableStatus(response.status)) {
+          throw new Error(errorBody || `Request failed: ${response.status}`);
+        }
+
+        break;
       }
 
-      throw new Error(errorBody || `Request failed: ${response.status}`);
+      activeApiBaseUrl = baseUrl;
+      return (await response.json()) as TRes;
     }
-
-    return (await response.json()) as TRes;
   }
 
-  throw new Error('Backend request failed after retries.');
+  const attempted = failures.length > 0 ? failures.join(', ') : baseUrls.join(', ');
+  throw new Error(
+    `Cannot reach backend API. Attempted: ${attempted}. Start backend with "npm run backend:dev" and keep phone + laptop on same Wi-Fi.`,
+  );
 };
 
 export const backendApi = {
@@ -93,6 +160,7 @@ export const backendApi = {
     return postJson<BackendFetchShareRequest, BackendFetchShareResponse>('/api/share/fetch', payload, {
       retries: 2,
       retryDelayMs: 400,
+      requestTimeoutMs: 5000,
     });
   },
 
@@ -119,6 +187,7 @@ export const backendApi = {
     return postJson('/api/share/update', payload, {
       retries: 1,
       retryDelayMs: 400,
+      requestTimeoutMs: 5000,
     });
   },
 };

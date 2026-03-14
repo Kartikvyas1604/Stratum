@@ -34,6 +34,7 @@ interface WalletContextValue extends WalletContextState {
   receiveAmount: string;
   refreshBalances: () => Promise<void>;
   logout: () => Promise<void>;
+  isNfcScanning: boolean;
 }
 
 const initialState: WalletContextState = {
@@ -54,6 +55,7 @@ const WalletContext = createContext<WalletContextValue | undefined>(undefined);
 export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [state, setState] = useState<WalletContextState>(initialState);
   const [receiveAmount, setReceiveAmount] = useState('');
+  const [isNfcScanning, setIsNfcScanning] = useState(false);
 
   const initializeNfc = useCallback(async () => {
     await nfcService.initialize();
@@ -95,17 +97,15 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
       shareA = split.shareA;
       shareB = split.shareB;
 
+      // Register with the backend first so we get a userId to embed in the NFC card metadata.
+      // This allows POS mode to auto-resolve the payer's identity without manual entry.
       const deviceFingerprint = await createDeviceFingerprint();
       const register = await backendApi.registerUser({
         deviceFingerprint,
         shareB: Buffer.from(shareB).toString('base64'),
       });
 
-      await nfcService.writeShareToCard(shareA, {
-        metadata: {
-          userId: register.userId,
-        },
-      });
+      await nfcService.writeShareToCard(shareA, { metadata: { userId: register.userId } });
 
       await secureStorage.saveSessionToken(register.sessionToken);
       await secureStorage.saveDeviceFingerprint(deviceFingerprint);
@@ -143,6 +143,9 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
       let encryptedBlob: Uint8Array | null = null;
 
       try {
+        if (!preloadedShareA) {
+          setIsNfcScanning(true);
+        }
         shareA = preloadedShareA ? Uint8Array.from(preloadedShareA) : await nfcService.readShareFromCard();
 
         const deviceFingerprint = await secureStorage.getDeviceFingerprint();
@@ -166,6 +169,7 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
       } catch (_error) {
         throw new Error('Authentication failed. Please verify card and password and try again.');
       } finally {
+        setIsNfcScanning(false);
         wipeUint8(encryptedBlob);
         wipeUint8(shareA);
         wipeUint8(shareB);
@@ -299,6 +303,7 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
       receiveAmount,
       refreshBalances,
       logout,
+      isNfcScanning,
     }),
     [
       initializeNfc,

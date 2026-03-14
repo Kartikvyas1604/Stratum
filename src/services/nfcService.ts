@@ -144,7 +144,17 @@ export const nfcService = {
     }
 
     try {
-      await NfcManager.requestTechnology(NfcTech.Ndef);
+      const requestedTech: NfcTech | NfcTech[] = Platform.OS === 'android'
+        ? [NfcTech.Ndef, NfcTech.NdefFormatable]
+        : NfcTech.Ndef;
+
+      const selectedTech = await NfcManager.requestTechnology(requestedTech);
+
+      if (Platform.OS === 'android' && selectedTech === NfcTech.NdefFormatable) {
+        await NfcManager.ndefFormatableHandlerAndroid.formatNdef(bytes);
+        return;
+      }
+
       const tag = await NfcManager.getTag();
 
       const maxSize = (tag as any)?.maxSize;
@@ -165,18 +175,6 @@ export const nfcService = {
 
       await NfcManager.ndefHandler.writeNdefMessage(bytes);
     } catch (err) {
-      // Demo parity: if the tag is not yet NDEF-formatted on Android, format and write once.
-      if (Platform.OS === 'android') {
-        try {
-          await NfcManager.cancelTechnologyRequest();
-          await NfcManager.requestTechnology(NfcTech.NdefFormatable);
-          await NfcManager.ndefFormatableHandlerAndroid.formatNdef(bytes);
-          return;
-        } catch (_formatErr) {
-          // Keep original error handling below to preserve user-friendly messaging.
-        }
-      }
-
       if (err instanceof NfcError.UserCancel) {
         throw new Error('NFC write canceled by user.');
       }
@@ -184,6 +182,9 @@ export const nfcService = {
         throw new Error('NFC write timed out. Hold the card near the phone and retry.');
       }
       if (err instanceof Error) {
+        if (err.message.toLowerCase().includes('not supported') || err.message.toLowerCase().includes('unknown')) {
+          throw new Error('Unsupported NFC tag type. Use an NDEF-capable ISO 14443 card (recommended NTAG215/NTAG216).');
+        }
         if (err.message.includes('IOException')) {
           throw new Error(
             'NFC write failed (I/O). Keep the phone still on the card and use an NDEF-writable card with enough capacity (recommended NTAG215/216).',
