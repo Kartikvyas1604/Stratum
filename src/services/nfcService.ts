@@ -36,6 +36,15 @@ export interface WriteShareOptions {
   };
 }
 
+type NdefRecordLike = {
+  type: number[] | Uint8Array;
+  payload: number[] | Uint8Array;
+};
+
+type NfcTagLike = {
+  ndefMessage?: NdefRecordLike[];
+};
+
 const buildPayload = (bytes: Uint8Array): number[] => {
   return Array.from(bytes);
 };
@@ -97,6 +106,77 @@ const parseCardMetadata = (rawText: string): CardMetadata | null => {
   } catch (_err) {
     return null;
   }
+};
+
+const decodeRecordType = (record: NdefRecordLike): string => {
+  try {
+    return Ndef.util.bytesToString(record.type);
+  } catch (_err) {
+    return '';
+  }
+};
+
+const extractCardDataFromNdefMessage = (ndefMessage: NdefRecordLike[]): ReadCardResult => {
+  if (!ndefMessage || ndefMessage.length === 0) {
+    throw new Error('No wallet share found on this NFC card.');
+  }
+
+  const shareRecord = ndefMessage.find((item) => {
+    const decodedType = decodeRecordType(item);
+    return (
+      decodedType === WALLET_RECORD_TYPE
+      || decodedType === LEGACY_WALLET_RECORD_TYPE
+      || decodedType === DEMO_EXTERNAL_RECORD_TYPE
+    );
+  });
+
+  const metadataRecord = ndefMessage.find((item) => decodeRecordType(item) === WALLET_META_RECORD_TYPE);
+
+  let resolvedUserId: string | null = null;
+  let resolvedPosToken: string | null = null;
+  if (metadataRecord?.payload) {
+    const metaJson = Buffer.from(metadataRecord.payload).toString('utf8');
+    const metadata = parseCardMetadata(metaJson);
+    resolvedUserId = metadata?.userId ?? null;
+    resolvedPosToken = metadata?.posToken ?? null;
+  }
+
+  if (shareRecord?.payload) {
+    const decodedType = decodeRecordType(shareRecord);
+
+    if (decodedType === WALLET_RECORD_TYPE || decodedType === LEGACY_WALLET_RECORD_TYPE) {
+      return {
+        shareA: Uint8Array.from(shareRecord.payload),
+        userId: resolvedUserId,
+        posToken: resolvedPosToken,
+      };
+    }
+
+    const externalJson = Buffer.from(shareRecord.payload).toString('utf8');
+    const parsedExternal = parseLegacyJsonShare(externalJson);
+    if (parsedExternal) {
+      return {
+        shareA: parsedExternal,
+        userId: resolvedUserId,
+        posToken: resolvedPosToken,
+      };
+    }
+  }
+
+  // Compatibility fallback for demo cards written as NDEF text records.
+  for (const item of ndefMessage) {
+    const textPayload = decodeNdefTextPayload(item.payload);
+    const parsed = parseLegacyJsonShare(textPayload);
+    if (parsed) {
+      return {
+        shareA: parsed,
+        userId: resolvedUserId,
+        posToken: resolvedPosToken,
+      };
+    }
+  }
+
+  throw new Error('Wallet share record not found on this NFC card.');
 };
 
 const ensureInit = async (): Promise<void> => {
@@ -237,84 +317,7 @@ export const nfcService = {
       await NfcManager.requestTechnology(NfcTech.Ndef);
       const tag = await NfcManager.getTag();
 
-      const ndefMessage = tag?.ndefMessage;
-      if (!ndefMessage || ndefMessage.length === 0) {
-        throw new Error('No wallet share found on this NFC card.');
-      }
-
-      const shareRecord = ndefMessage.find((item) => {
-        try {
-          const decodedType = Ndef.util.bytesToString(item.type);
-          return (
-            decodedType === WALLET_RECORD_TYPE
-            || decodedType === LEGACY_WALLET_RECORD_TYPE
-            || decodedType === DEMO_EXTERNAL_RECORD_TYPE
-          );
-        } catch (_err) {
-          return false;
-        }
-      });
-
-      const metadataRecord = ndefMessage.find((item) => {
-        try {
-          const decodedType = Ndef.util.bytesToString(item.type);
-          return decodedType === WALLET_META_RECORD_TYPE;
-        } catch (_err) {
-          return false;
-        }
-      });
-
-      let resolvedUserId: string | null = null;
-      let resolvedPosToken: string | null = null;
-      if (metadataRecord?.payload) {
-        const metaJson = Buffer.from(metadataRecord.payload).toString('utf8');
-        const metadata = parseCardMetadata(metaJson);
-        resolvedUserId = metadata?.userId ?? null;
-        resolvedPosToken = metadata?.posToken ?? null;
-      }
-
-      if (shareRecord?.payload) {
-        const decodedType = (() => {
-          try {
-            return Ndef.util.bytesToString(shareRecord.type);
-          } catch (_err) {
-            return '';
-          }
-        })();
-
-        if (decodedType === WALLET_RECORD_TYPE || decodedType === LEGACY_WALLET_RECORD_TYPE) {
-          return {
-            shareA: Uint8Array.from(shareRecord.payload),
-            userId: resolvedUserId,
-            posToken: resolvedPosToken,
-          };
-        }
-
-        const externalJson = Buffer.from(shareRecord.payload).toString('utf8');
-        const parsedExternal = parseLegacyJsonShare(externalJson);
-        if (parsedExternal) {
-          return {
-            shareA: parsedExternal,
-            userId: resolvedUserId,
-            posToken: resolvedPosToken,
-          };
-        }
-      }
-
-      // Compatibility fallback for demo cards written as NDEF text records.
-      for (const item of ndefMessage) {
-        const textPayload = decodeNdefTextPayload(item.payload);
-        const parsed = parseLegacyJsonShare(textPayload);
-        if (parsed) {
-          return {
-            shareA: parsed,
-            userId: resolvedUserId,
-            posToken: resolvedPosToken,
-          };
-        }
-      }
-
-      throw new Error('Wallet share record not found on this NFC card.');
+      return extractCardDataFromNdefMessage((tag?.ndefMessage ?? []) as NdefRecordLike[]);
     } catch (err) {
       if (err instanceof NfcError.UserCancel) {
         throw new Error('NFC read canceled by user.');
@@ -361,9 +364,16 @@ export const nfcService = {
     await NfcManager.goToNfcSetting();
   },
 
-  async startReaderMode(onDiscovered: () => void): Promise<void> {
+  async startReaderMode(onDiscovered: (tag: unknown) => void): Promise<void> {
     NfcManager.setEventListener(NfcEvents.DiscoverTag, onDiscovered);
     await NfcManager.registerTagEvent();
+  },
+
+  async readCardDataFromTag(tag: unknown): Promise<ReadCardResult> {
+    await ensureInit();
+
+    const nfcTag = (tag ?? {}) as NfcTagLike;
+    return extractCardDataFromNdefMessage((nfcTag.ndefMessage ?? []) as NdefRecordLike[]);
   },
 
   async stopReaderMode(): Promise<void> {

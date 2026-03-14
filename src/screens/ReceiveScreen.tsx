@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
 import { GlassCard } from '../components/GlassCard';
 import { PrimaryButton } from '../components/PrimaryButton';
@@ -41,6 +42,7 @@ export const ReceiveScreen: React.FC = () => {
   const [posTokenManual, setPosTokenManual] = useState('');
   const [isNfcReading, setIsNfcReading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [autoReaderEnabled, setAutoReaderEnabled] = useState(true);
 
   const receiveAddress = useMemo(
     () => (asset.includes('SOL') || asset === 'SOL' ? addresses?.sol ?? '' : addresses?.eth ?? ''),
@@ -165,6 +167,61 @@ export const ReceiveScreen: React.FC = () => {
     }
   };
 
+  useFocusEffect(
+    React.useCallback(() => {
+      if (mode !== 'pos' || !autoReaderEnabled) {
+        return () => undefined;
+      }
+
+      let active = true;
+
+      nfcService.startReaderMode((tag) => {
+        if (!active || isNfcReading || loading) {
+          return;
+        }
+
+        setIsNfcReading(true);
+        nfcService.readCardDataFromTag(tag)
+          .then((readResult) => {
+            if (!active) {
+              return;
+            }
+
+            if (posShareA) {
+              wipeUint8(posShareA);
+            }
+            setPosShareA(readResult.shareA);
+
+            if (readResult.userId) {
+              setPayerUserId(readResult.userId);
+              setPayerUserIdAutoResolved(true);
+            } else {
+              setPayerUserIdAutoResolved(false);
+            }
+
+            if (readResult.posToken) {
+              setPosToken(readResult.posToken);
+              setPosTokenAutoResolved(true);
+            } else {
+              setPosToken(null);
+              setPosTokenAutoResolved(false);
+            }
+          })
+          .catch(() => undefined)
+          .finally(() => {
+            if (active) {
+              setIsNfcReading(false);
+            }
+          });
+      }).catch(() => undefined);
+
+      return () => {
+        active = false;
+        nfcService.stopReaderMode().catch(() => undefined);
+      };
+    }, [autoReaderEnabled, isNfcReading, loading, mode, posShareA]),
+  );
+
   return (
     <KeyboardAvoidingView style={styles.kbv} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
@@ -247,8 +304,12 @@ export const ReceiveScreen: React.FC = () => {
             <GlassCard>
               <Text style={styles.posMetaLabel}>NFC Reader</Text>
               <Text style={styles.posMetaText}>
-                {isNfcReading ? 'Listening for NFC card… keep card near phone.' : posShareA ? 'Payer card loaded. Ready for password.' : 'Tap to scan payer card and load Share A.'}
+                {isNfcReading ? 'Listening for NFC card… keep card near phone.' : posShareA ? 'Payer card loaded. Ready for password.' : 'Tap payer card near phone to auto-load Share A.'}
               </Text>
+              <Pressable onPress={() => setAutoReaderEnabled((v) => !v)} style={styles.toggleTapRow}>
+                <View style={[styles.toggleDot, autoReaderEnabled && styles.toggleDotOn]} />
+                <Text style={styles.toggleTapText}>Auto reader {autoReaderEnabled ? 'ON' : 'OFF'}</Text>
+              </Pressable>
               <PrimaryButton
                 title={posShareA ? 'Rescan Payer Card' : 'Tap Payer Card'}
                 onPress={onReadPayerCard}
@@ -444,6 +505,29 @@ const styles = StyleSheet.create({
   tokenResolvedText: {
     color: theme.colors.accent,
     fontSize: 13,
+    fontWeight: '600',
+  },
+  toggleTapRow: {
+    marginBottom: theme.spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  toggleDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: 'transparent',
+  },
+  toggleDotOn: {
+    backgroundColor: theme.colors.accent,
+    borderColor: theme.colors.accent,
+  },
+  toggleTapText: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
     fontWeight: '600',
   },
   inputInCard: { marginBottom: theme.spacing.sm },

@@ -23,7 +23,11 @@ interface WalletContextValue extends WalletContextState {
   initializeNfc: () => Promise<void>;
   hydrateWallet: () => Promise<void>;
   setupWallet: (password: string, existingMnemonic?: string) => Promise<void>;
-  sendPaymentFromOwnDevice: (password: string, request: PaymentRequest) => Promise<TransactionPreview>;
+  sendPaymentFromOwnDevice: (
+    password: string,
+    request: PaymentRequest,
+    preloadedShareA?: Uint8Array,
+  ) => Promise<TransactionPreview>;
   sendPaymentInPosMode: (
     password: string,
     payerUserId: string,
@@ -218,9 +222,14 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
     [],
   );
 
-  const signAndBroadcast = useCallback(async (request: PaymentRequest, password: string, userId: string) => {
+  const signAndBroadcast = useCallback(async (
+    request: PaymentRequest,
+    password: string,
+    userId: string,
+    preloadedShareA?: Uint8Array,
+  ) => {
     validatePaymentRequest(request);
-    const secrets = await reconstructSecrets(password, userId);
+    const secrets = await reconstructSecrets(password, userId, preloadedShareA);
 
     try {
       // Key material exists only within this isolated async function scope and is wiped immediately after signing.
@@ -247,12 +256,12 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
   }, [reconstructSecrets]);
 
   const sendPaymentFromOwnDevice = useCallback(
-    async (password: string, request: PaymentRequest): Promise<TransactionPreview> => {
+    async (password: string, request: PaymentRequest, preloadedShareA?: Uint8Array): Promise<TransactionPreview> => {
       if (!state.userId) {
         throw new Error('Wallet is not setup yet.');
       }
 
-      const txHash = await signAndBroadcast(request, password, state.userId);
+      const txHash = await signAndBroadcast(request, password, state.userId, preloadedShareA);
       const tx: TransactionPreview = {
         id: (QuickCrypto as any).randomBytes(8).toString('hex'),
         chain: request.asset.includes('SOL') || request.asset === 'SOL' ? 'solana' : 'ethereum',

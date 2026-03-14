@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,12 +12,15 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { GlassCard } from '../components/GlassCard';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { SectionLabel } from '../components/SectionLabel';
 import { theme } from '../constants/theme';
 import { useWallet } from '../context/WalletContext';
+import { nfcService } from '../services/nfcService';
+import { wipeUint8 } from '../utils/memory';
 import { ChainAsset } from '../types';
 import { isPositiveAmount, validateRecipientByAsset } from '../utils/validation';
 
@@ -38,10 +41,13 @@ export const PayScreen: React.FC = () => {
   const [amount, setAmount] = useState('');
   const [asset, setAsset] = useState<ChainAsset>('ETH');
   const [loading, setLoading] = useState(false);
+  const [tapToPayEnabled, setTapToPayEnabled] = useState(true);
+
+  const lastTapAtRef = useRef(0);
 
   const canSubmit = useMemo(() => !!(password && recipient && amount), [password, recipient, amount]);
 
-  const submit = async () => {
+  const submit = async (preloadedShareA?: Uint8Array) => {
     const trimmedRecipient = recipient.trim();
     const trimmedAmount = amount.trim();
 
@@ -64,7 +70,11 @@ export const PayScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      const tx = await sendPaymentFromOwnDevice(password, { recipient: trimmedRecipient, amount: trimmedAmount, asset });
+      const tx = await sendPaymentFromOwnDevice(
+        password,
+        { recipient: trimmedRecipient, amount: trimmedAmount, asset },
+        preloadedShareA,
+      );
       Alert.alert('Payment sent', `Transaction ${tx.txHash ?? 'submitted'} confirmed.`);
       setPassword('');
       setRecipient('');
@@ -73,8 +83,53 @@ export const PayScreen: React.FC = () => {
       Alert.alert('Payment failed', error instanceof Error ? error.message : 'Unable to send payment.');
     } finally {
       setLoading(false);
+      if (preloadedShareA) {
+        wipeUint8(preloadedShareA);
+      }
     }
   };
+
+  const onTapTagWhileFocused = useCallback(async (tag: unknown) => {
+    if (!tapToPayEnabled || loading) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastTapAtRef.current < 1200) {
+      return;
+    }
+    lastTapAtRef.current = now;
+
+    if (!password.trim() || !recipient.trim() || !amount.trim()) {
+      return;
+    }
+
+    try {
+      const readResult = await nfcService.readCardDataFromTag(tag);
+      await submit(readResult.shareA);
+    } catch (error) {
+      Alert.alert('Tap to Pay failed', error instanceof Error ? error.message : 'Unable to read NFC card.');
+    }
+  }, [amount, loading, password, recipient, tapToPayEnabled]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      nfcService.startReaderMode((tag) => {
+        if (!active) {
+          return;
+        }
+
+        onTapTagWhileFocused(tag).catch(() => undefined);
+      }).catch(() => undefined);
+
+      return () => {
+        active = false;
+        nfcService.stopReaderMode().catch(() => undefined);
+      };
+    }, [onTapTagWhileFocused]),
+  );
 
   return (
     <KeyboardAvoidingView
@@ -151,8 +206,14 @@ export const PayScreen: React.FC = () => {
             autoCapitalize="none"
           />
           <Text style={styles.authHint}>
-            📳  Your NFC card will be scanned after you tap Confirm.
+            📳  Tap your card anytime on this screen to auto-pay when form is complete.
           </Text>
+          <Pressable onPress={() => setTapToPayEnabled((v) => !v)} style={styles.toggleTapRow}>
+            <View style={[styles.toggleDot, tapToPayEnabled && styles.toggleDotOn]} />
+            <Text style={styles.toggleTapText}>
+              Tap-to-pay listener {tapToPayEnabled ? 'ON' : 'OFF'}
+            </Text>
+          </Pressable>
         </GlassCard>
 
         <PrimaryButton
@@ -234,4 +295,27 @@ const styles = StyleSheet.create({
   },
   inputInCard: { marginBottom: theme.spacing.sm },
   authHint: { color: theme.colors.textSecondary, fontSize: 13, lineHeight: 18 },
+  toggleTapRow: {
+    marginTop: theme.spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  toggleDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: 'transparent',
+  },
+  toggleDotOn: {
+    backgroundColor: theme.colors.accent,
+    borderColor: theme.colors.accent,
+  },
+  toggleTapText: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
 });
