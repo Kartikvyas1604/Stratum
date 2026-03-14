@@ -12,11 +12,11 @@
     "start:bckend": "npm --prefix backend run dev"
   },
   "dependencies": {
-    "@solana/spl-token": "^0.4.14",
     "@craftzdog/react-native-buffer": "^6.1.1",
     "@react-native-clipboard/clipboard": "^1.16.3",
     "@react-navigation/bottom-tabs": "^7.5.7",
     "@react-navigation/native": "^7.1.18",
+    "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
     "bip39": "^3.1.0",
     "buffer": "^6.0.3",
@@ -31,6 +31,7 @@
     "react-native-gesture-handler": "^2.28.0",
     "react-native-get-random-values": "^2.0.0",
     "react-native-keychain": "^10.0.0",
+    "react-native-linear-gradient": "^2.8.3",
     "react-native-nfc-manager": "^3.17.1",
     "react-native-qrcode-svg": "^6.3.17",
     "react-native-quick-base64": "^2.2.2",
@@ -39,6 +40,7 @@
     "react-native-safe-area-context": "^5.6.1",
     "react-native-screens": "^4.17.1",
     "react-native-svg": "^15.15.0",
+    "react-native-vector-icons": "^10.3.0",
     "react-native-worklets": "^0.7.4",
     "shamirs-secret-sharing": "^2.0.1",
     "stream-browserify": "^3.0.0",
