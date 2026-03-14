@@ -1,125 +1,184 @@
-# NFC Split-Key Crypto Wallet + Mobile POS (React Native + Express)
+# NFC Split-Key Wallet + Mobile POS
 
-This repository contains:
-- A React Native (TypeScript) mobile app for iOS/Android NFC split-key wallet + POS flows
-- An Express.js backend using PostgreSQL and Supabase SDK integration points
+React Native mobile wallet that splits wallet secret into two parts:
 
-## Full Project Structure
+- Share A on NFC card
+- Share B on backend
+
+Both shares are required to decrypt and sign transactions.
+
+## Current Network Targets
+
+- Ethereum: Sepolia
+- Solana: Devnet
+
+Configured in src/config.ts.
+
+## What Is Working
+
+### Mobile app
+
+- Onboarding wizard with 3 steps (Choose, Seed Phrase, Password)
+- Create wallet and import wallet flow
+- Seed phrase reveal/hide
+- Seed phrase copy button (clipboard)
+- Password-protected setup
+- NFC write/read for card share
+- Pay flow (ETH, SOL, USDC on Ethereum)
+- Receive/POS screen with QR and POS mode
+- Wallet screen with network-labeled balances and addresses
+- Bottom-tab app navigation with custom icons
+
+### Security flow
+
+- BIP39 mnemonic generation/validation
+- HD derivation for Ethereum and Solana
+- AES-256-GCM encryption
+- PBKDF2 SHA-512 (310000 iterations)
+- 2-of-2 Shamir split
+- Sensitive data wiping in memory after use
+
+### Backend
+
+- Express API routes for register/fetch/update share
+- Health endpoint
+- PostgreSQL mode supported
+- In-memory fallback mode supported (for demos when DATABASE_URL is not set)
+
+### Smart contracts
+
+- Separate Hardhat workspace in contracts/
+- See contracts/README.md
+
+## High-Level Architecture
+
+1. User creates/imports mnemonic on mobile.
+2. App encrypts mnemonic payload with password.
+3. Encrypted blob is split into Share A and Share B.
+4. Share A is written to NFC card.
+5. Share B is stored on backend with device fingerprint and session token.
+6. To sign a transaction, app reads Share A + fetches Share B + reconstructs + decrypts + signs.
+
+## Repository Structure
 
 ```text
 ethmumbai/
-  App.tsx
-  app.json
-  index.ts
-  package.json
-  tsconfig.json
-  babel.config.js
-  metro.config.js
-  src/
-    AppRoot.tsx
-    config.ts
-    global.d.ts
-    constants/
-      theme.ts
-    components/
-      GlassCard.tsx
-      PrimaryButton.tsx
-    context/
-      WalletContext.tsx
-    navigation/
-      RootNavigation.tsx
-    screens/
-      OnboardingScreen.tsx
-      WalletScreen.tsx
-      PayScreen.tsx
-      ReceiveScreen.tsx
-      SettingsScreen.tsx
-    services/
-      backendApi.ts
-      blockchainService.ts
-      cryptoService.ts
-      nfcService.ts
-      secureStorage.ts
-    types/
-      index.ts
-    utils/
-      memory.ts
-  backend/
-    package.json
-    tsconfig.json
-    .env.example
-    sql/
-      schema.sql
-    src/
-      index.ts
-      config/
-        db.ts
-        env.ts
-        supabase.ts
-      routes/
-        userRoutes.ts
-        shareRoutes.ts
-      services/
-        shareService.ts
-  contracts/
-    package.json
-    hardhat.config.ts
-    .env.example
-    contracts/
-      NfcPosPaymentHub.sol
-    scripts/
-      deploy.ts
-    test/
-      NfcPosPaymentHub.test.ts
+  src/                 # React Native app code
+  backend/             # Express backend
+  contracts/           # Hardhat smart contracts workspace
 ```
 
-## Mobile Features Implemented
+## Prerequisites
 
-### Flow 1: First-Time Wallet Setup
-- Onboarding + password setup screen
-- BIP39 12-word mnemonic generation (`bip39`)
-- ETH derivation via `ethereumjs-wallet` HD path
-- SOL derivation via `@solana/web3.js` + `ed25519-hd-key`
-- AES-256-GCM encryption (`react-native-quick-crypto`)
-- PBKDF2 SHA-512, 310000 iterations
-- 2-of-2 Shamir split (`shamirs-secret-sharing`)
-- NFC write of Share A (`react-native-nfc-manager`)
-- Backend register storing Share B
-- Session token + device fingerprint in `react-native-keychain`
+- Node.js 20+
+- npm 10+
+- React Native CLI toolchain
+- Android Studio (for Android)
+- Xcode + CocoaPods (for iOS)
+- NFC-enabled Android/iOS device for NFC flows
 
-### Flow 2: Sending Payment (Payer)
-- Pay tab with password + recipient + amount + asset
-- Reads Share A from NFC card
-- Fetches Share B from backend with auth factors
-- Reconstructs/decrypts secret in isolated async scope
-- Sends ETH / SOL / USDC(ETH)
-- Wipes key material after signing path
+## Quick Start
 
-### Flow 3: Receiving/POS (Merchant)
-- Receive tab with amount, asset, QR code display, POS processing
-- Uses payer credentials + NFC card flow on merchant device
-- Reconstructs payer secret locally to sign then broadcast
-- Confirmation shown in app UI
+### 1) Install app dependencies
 
-## Security Notes in Code
+```bash
+npm install
+```
 
-The code includes comments for:
-- Why Shamir split is used instead of plain file splitting
-- Why key material is wiped after signing
-- Why server-side share release requires device + session authentication
-- Threat model: card-only compromise is insufficient, server-only compromise is insufficient
+### 2) Install backend dependencies
 
-## Backend API Contracts
+```bash
+npm --prefix backend install
+```
 
-### `POST /api/user/register`
+### 3) Configure API URL for physical device
+
+If testing on a real phone, set src/config.ts apiBaseUrl to your laptop LAN IP:
+
+```ts
+apiBaseUrl: 'http://YOUR_LAN_IP:4000'
+```
+
+Do not use localhost on a physical phone.
+
+### 4) Start backend
+
+```bash
+npm run backend:dev
+```
+
+Verify:
+
+```bash
+curl http://127.0.0.1:4000/health
+```
+
+Expected:
+
+```json
+{"ok":true}
+```
+
+### 5) Start Metro
+
+```bash
+npm start -- --reset-cache
+```
+
+### 6) Run app
+
+Android:
+
+```bash
+npm run android
+```
+
+iOS:
+
+```bash
+cd ios && pod install
+npm run ios
+```
+
+## Backend Modes
+
+### Demo mode (no DB)
+
+If DATABASE_URL is missing, backend automatically runs with in-memory store.
+
+- Good for demos
+- Data resets when server restarts
+
+### PostgreSQL mode
+
+Create backend/.env (from backend/.env.example) and set DATABASE_URL.
+
+Optional Supabase vars can also be set:
+
+- SUPABASE_URL
+- SUPABASE_SERVICE_ROLE_KEY
+
+For persistent DB schema:
+
+```bash
+psql "$DATABASE_URL" -f backend/sql/schema.sql
+```
+
+## API Endpoints
+
+### POST /api/user/register
+
 Request:
+
 ```json
 {
   "deviceFingerprint": "string",
   "shareB": "base64-string"
 }
 ```
+
 Response:
+
 ```json
 {
   "userId": "uuid",
@@ -127,8 +186,10 @@ Response:
 }
 ```
 
-### `POST /api/share/fetch`
+### POST /api/share/fetch
+
 Request:
+
 ```json
 {
   "userId": "uuid",
@@ -136,15 +197,19 @@ Request:
   "sessionToken": "string"
 }
 ```
+
 Response:
+
 ```json
 {
   "shareB": "base64-string"
 }
 ```
 
-### `POST /api/share/update`
+### POST /api/share/update
+
 Request:
+
 ```json
 {
   "userId": "uuid",
@@ -153,91 +218,80 @@ Request:
   "nextShareB": "base64-string"
 }
 ```
+
 Response:
+
 ```json
 {
   "success": true
 }
 ```
 
-## Supabase + PostgreSQL Notes
+## NFC Notes
 
-- PostgreSQL stores `user_shares` records (Share B, device fingerprint, session token)
-- Supabase client is initialized for integration with managed auth/workflows
-- In production: verify Supabase JWT/session before releasing Share B
+- Use writable NDEF cards.
+- Small cards can fail with capacity limits.
+- App now uses compact payload + compact record type to reduce size.
+- Recommended tags: NTAG215 or NTAG216 for reliable capacity headroom.
 
-## Setup Instructions
+## Chain Configuration Details
 
-## 1) Install mobile dependencies
+From src/config.ts:
 
-```bash
-npm install
-```
+- ethRpcUrl: Sepolia public RPC
+- solRpcUrl: Solana Devnet RPC
+- usdcEthContract: Sepolia USDC contract
+- usdcSolMint: Devnet USDC mint
 
-## 2) Install backend dependencies
+Wallet screen labels balances by chain/network so users can see Ethereum vs Solana context.
 
-```bash
-cd backend
-npm install
-cp .env.example .env
-```
+## Known Limitations
 
-Fill `backend/.env` values:
-- `DATABASE_URL`
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- USDC transfer on Solana is placeholder and not yet implemented.
+- Recovery and key rotation flows are placeholder-level.
+- Demo backend in-memory mode is not persistent.
+- Public RPC endpoints may rate-limit under heavy usage.
 
-## 3) Create database table
+## Troubleshooting
 
-Run:
+### Cannot reach backend API from phone
 
-```bash
-psql "$DATABASE_URL" -f backend/sql/schema.sql
-```
+- Ensure backend is running on port 4000
+- Ensure phone and laptop are on same Wi-Fi
+- Use LAN IP in src/config.ts, not localhost
+- Check macOS firewall allows incoming connections
 
-## 4) Start backend
+### NFC write capacity too small
 
-```bash
-npm run backend:dev
-```
+- Try a larger NDEF tag (NTAG215/216)
+- Ensure card is writable and not locked read-only
 
-## 5) React Native native setup prerequisites
+### TypeScript checks
 
-Use standard React Native CLI prerequisites:
-- Android Studio + SDK (Android 8+)
-- Xcode + CocoaPods (iOS 14+)
-
-Then run:
+App:
 
 ```bash
-npm run ios
-# or
-npm run android
+npx tsc --noEmit
 ```
 
-## 6) NFC notes
+Backend:
 
-- iOS: enable NFC capability in Xcode project settings
-- Android: ensure NFC permissions and foreground dispatch support are configured in `AndroidManifest.xml`
-- Tag password protection for Type 4 cards depends on card vendor APDU commands; placeholder included in `nfcService`
+```bash
+cd backend && npx tsc --noEmit
+```
 
-## Known Gaps / Placeholders
+## Scripts
 
-- USDC on Solana transfer is intentionally placeholder (requires SPL token account strategy)
-- Recovery flow is placeholder (must include verified identity process + share rotation)
-- Full native iOS/Android project folders are expected in a React Native CLI initialized repo
+Root package.json:
 
-## Smart Contracts
+- npm start
+- npm run android
+- npm run ios
+- npm run typecheck
+- npm run backend:dev
 
-A dedicated Solidity workspace is now included under [contracts/README.md](contracts/README.md) for Ethereum POS settlement:
-- Native ETH settlement
-- ERC-20 settlement (USDC-compatible)
-- Merchant config and payout routing
-- Fee support and immutable payment receipt events
+Backend package.json:
 
-## Recommended Next Security Hardening
-
-1. Move decryption/signing into native secure module (TEE/SE-backed where available)
-2. Add remote attestation + certificate pinning before releasing Share B
-3. Enforce rate limits, anti-bruteforce lockouts, and anomaly detection on `/api/share/fetch`
-4. Add transaction simulation and user-verification screens before signing
+- npm run dev
+- npm run build
+- npm run start
